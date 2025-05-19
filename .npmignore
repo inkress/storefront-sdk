@@ -1,0 +1,23 @@
+# Source files
+src/
+tests/
+
+# Config files
+.eslintrc
+.prettierrc
+tsconfig*.json
+.github/
+.vscode/
+.idea/
+.gitlab/
+.travis.yml
+.gitlab-ci.yml
+.circleci/
+
+# Development files
+*.log
+coverage/
+.nyc_output/
+node_modules/
+*.tgz
+.DS_Store
