@@ -79,16 +79,28 @@ class Inkress implements InkressInterface {
     try {
       const jsonStr = JSON.stringify(data);
       
-      // Handle encoding differently based on environment
-      const isNode = typeof window === 'undefined' && typeof process !== 'undefined';
+      // Detect browser environment by checking for window object
+      const isBrowser = typeof window !== 'undefined';
       
-      if (isNode) {
-        // Node.js environment
-        return Buffer.from(jsonStr).toString('base64');
-      } else {
-        // Browser environment
-        return btoa(unescape(encodeURIComponent(jsonStr)));
+      if (!isBrowser) {
+        // Server environment - try to use Buffer if it exists
+        // without directly referencing Node.js types
+        try {
+          // Using Function constructor to avoid direct reference to global and process
+          // This is a workaround to prevent TypeScript errors
+          const getBufferFn = new Function('return typeof Buffer !== "undefined" ? Buffer : null')();
+          
+          if (getBufferFn) {
+            // If Buffer exists, use it for base64 encoding
+            return getBufferFn.from(jsonStr).toString('base64');
+          }
+        } catch (e) {
+          console.warn('Server-side Buffer not available, falling back to browser method');
+        }
       }
+      
+      // Browser environment or fallback
+      return btoa(unescape(encodeURIComponent(jsonStr)));
     } catch (error) {
       console.error('Error encoding JSON to base64:', error);
       throw new Error('Failed to encode payment data');
