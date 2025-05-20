@@ -1,46 +1,24 @@
 {
-  "name": "storefront-sdk",
-  "version": "0.1.0",
-  "description": "Inkress payment processing library",
-  "main": "./dist/cjs/index.js",
-  "module": "./dist/esm/index.js",
-  "types": "./dist/types/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/esm/index.js",
-      "require": "./dist/cjs/index.js",
-      "types": "./dist/types/index.d.ts"
-    }
-  },
-  "files": [
-    "dist"
-  ],
-  "sideEffects": false,
-  "scripts": {
-    "clean": "rimraf dist",
-    "build:esm": "tsc --project tsconfig.json",
-    "build:cjs": "tsc --project tsconfig.cjs.json",
-    "build": "yarn clean && yarn build:esm && yarn build:cjs",
-    "prepublishOnly": "yarn build"
-  },
-  "keywords": [
-    "payment",
-    "inkress",
-    "jamaican payments"
-  ],
-  "author": "Inkress",
+  "name": "@inkress/storefront-sdk",
+  "version": "0.0.5",
+  "description": "initial version of the @inkress/storefront-sdk",
+  "main": "dist/index.js",
+  "types": "types/index.d.ts",
+  "repository": "https://github.com/SirFitz/@inkress/storefront-sdk",
+  "author": "Sirfitz",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/inkress/storefront-sdk"
+  "private": false,
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint . --ext .ts"
   },
-  "bugs": {
-    "url": "https://github.com/inkress/storefront-sdk/issues"
-  },
-  "homepage": "https://github.com/inkress/storefront-sdk#readme",
   "devDependencies": {
-    "@types/node": "^22.15.19",
-    "rimraf": "^5.0.5",
-    "typescript": "^5.3.3"
+    "@types/jsonwebtoken": "^9.0.2",
+    "tsc": "^2.0.4",
+    "typescript": "^5.1.6"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.1"
   }
 }
