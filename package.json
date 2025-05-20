@@ -1,10 +1,10 @@
 {
   "name": "@inkress/storefront-sdk",
-  "version": "0.0.5",
+  "version": "0.0.1",
   "description": "initial version of the @inkress/storefront-sdk",
   "main": "dist/index.js",
   "types": "types/index.d.ts",
-  "repository": "https://github.com/SirFitz/@inkress/storefront-sdk",
+  "repository": "https://github.com/inkress/storefront-sdk",
   "author": "Sirfitz",
   "license": "MIT",
   "scripts": {
@@ -13,11 +13,7 @@
     "lint": "eslint . --ext .ts"
   },
   "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.2",
     "tsc": "^2.0.4",
     "typescript": "^5.1.6"
-  },
-  "dependencies": {
-    "jsonwebtoken": "^9.0.1"
   }
 }
