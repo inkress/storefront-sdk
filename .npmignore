@@ -13,6 +13,7 @@ tsconfig*.json
 .travis.yml
 .gitlab-ci.yml
 .circleci/
+.yarn/
 
 # Development files
 *.log
