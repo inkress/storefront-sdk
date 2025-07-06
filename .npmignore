@@ -1,0 +1,48 @@
+# Source files
+src/
+tests/
+*.test.ts
+*.test.js
+
+# Development files
+.git/
+.github/
+node_modules/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build tools
+rollup.config.js
+tsconfig.json
+jest.config.js
+.eslintrc.*
+
+# Development artifacts
+.nyc_output/
+coverage/
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment files
+.env
+.env.local
+.env.test
+.env.production
