@@ -39,12 +39,12 @@ async function demonstrateGenericsUsage() {
     // Example 3: Get a specific generic by key
     const preferences = await inkress.generics.getByKey('user-preferences');
     if (preferences.data) {
-      console.log('Retrieved preferences:', preferences.data.entries);
+      console.log('Retrieved preferences:', preferences.result?.entries);
     }
 
     // Example 4: List all generics of a specific kind
     const allUserSettings = await inkress.generics.getByKind(1);
-    console.log('All user settings:', allUserSettings.data);
+    console.log('All user settings:', allUserSettings.result?.entries);
 
     // Example 5: Update existing generic
     if (userPreferences.data) {
@@ -69,7 +69,7 @@ async function demonstrateGenericsUsage() {
       pageViews: 1
     });
 
-    console.log('Upserted session data:', upserteddata.entries);
+    console.log('Upserted session data:', upsertedData.result);
 
     // Example 7: List all generics with filtering
     const filteredGenerics = await inkress.generics.list({

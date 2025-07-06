@@ -235,8 +235,8 @@ async function getProductsByCategory(categoryId: number) {
 async function getCategoryStats() {
   const allCategories = await inkress.categories.list({ limit: 1000 });
   
-  if (allCategories.data) {
-    const categories = allCategories.data.entries;
+  if (allCategories.result) {
+    const categories = allCategories.result.entries;
     return {
       total: categories.length,
       roots: categories.filter(c => !c.parent_id).length,

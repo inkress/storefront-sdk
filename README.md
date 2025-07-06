@@ -35,7 +35,7 @@ const sdk = new InkressStorefrontSDK({
 
 // Load products
 const response = await sdk.products.search({ limit: 10 });
-const products = response.data?.entries || [];
+const products = response.result?.entries || [];
 
 // Add to cart
 const product = products[0];
@@ -123,7 +123,7 @@ const newCategory = await sdk.categories.create({
 });
 
 // Create subcategory (requires authentication)
-const subcategory = await sdk.categories.createSubcategory(newCategory.data.id, {
+const subcategory = await sdk.categories.createSubcategory(newCategory.result.id, {
   name: 'Smart Speakers',
   description: 'Voice-activated speakers',
   kind: 1
@@ -137,9 +137,9 @@ The SDK provides methods to access public merchant information, essential for bu
 ```typescript
 // Get merchant profile (name, logo, about, etc.)
 const merchant = await sdk.merchants.getByUsername('acme-store');
-console.log(merchant.data.name);       // "Acme Store"
-console.log(merchant.data.logo);       // "https://example.com/logo.jpg"
-console.log(merchant.data.about);      // "We sell quality products"
+console.log(merchant.result.name);       // "Acme Store"
+console.log(merchant.result.logo);       // "https://example.com/logo.jpg"
+console.log(merchant.result.about);      // "We sell quality products"
 
 // Get merchant's products
 const products = await sdk.merchants.getProducts('acme-store', {
@@ -149,25 +149,25 @@ const products = await sdk.merchants.getProducts('acme-store', {
 
 // Get merchant's fee structure
 const fees = await sdk.merchants.getFees('acme-store');
-console.log(fees.data.fees.platform_fee);           // Platform fee
-console.log(fees.data.fees.payment_processing_fee); // Payment processing fee
-console.log(fees.data.fees.total_fees);             // Total fees
+console.log(fees.result.fees.platform_fee);           // Platform fee
+console.log(fees.result.fees.payment_processing_fee); // Payment processing fee
+console.log(fees.result.fees.total_fees);             // Total fees
 
 // Get merchant's public API tokens
 const tokens = await sdk.merchants.getTokens('acme-store');
-console.log(tokens.data.publishable_key); // For client-side integrations
+console.log(tokens.result.publishable_key); // For client-side integrations
 
 // Get merchant's payment methods
 const paymentMethods = await sdk.merchants.getPaymentMethods('acme-store');
-const enabled = paymentMethods.data?.filter(method => method.enabled);
+const enabled = paymentMethods.result?.entries?.filter(method => method.enabled);
 console.log(enabled); // Only enabled payment methods
 
 // Complete storefront setup example
 const storefront = {
-  merchant: merchant.data,
-  products: products.data?.entries || [],
+  merchant: merchant.result,
+  products: products.result?.entries || [],
   paymentMethods: enabled,
-  feeStructure: fees.data
+  feeStructure: fees.result
 };
 ```
 
@@ -314,27 +314,15 @@ const order = await sdk.orders.get(123);
 // Find order by reference ID
 const orderByRef = await sdk.orders.getByReference('ORD-2024-001');
 
-// Get order tracking info
-const tracking = await sdk.orders.getTracking(123);
-console.log(`Tracking: ${tracking.data.tracking_number}`);
-
-// Cancel order (if cancellable)
-if (sdk.orders.isCancellable(order.data)) {
-  await sdk.orders.cancel(123, 'Customer request');
-}
 
 // === Order Status & Statistics ===
 
 // Get public order status (no auth required)
 const status = await sdk.orders.getStatus('ord_abc123');
-console.log(`Status: ${status.data.entries.result}`);
+console.log(`Status: ${status.result.entries.result}`);
 
 // Get detailed order info (requires auth)
 const detailed = await sdk.orders.getDetailedStatus('ord_abc123');
-
-// Get order statistics (for merchants)
-const stats = await sdk.orders.getStats();
-console.log(`Total orders: ${stats.data.total_orders}`);
 
 // === Convenience Methods ===
 
@@ -346,9 +334,6 @@ const pending = await sdk.orders.getPending();
 const completed = await sdk.orders.getCompleted();
 const cancelled = await sdk.orders.getCancelled();
 
-// Check order capabilities
-const canCancel = sdk.orders.isCancellable(order.data);
-const canTrack = sdk.orders.isTrackable(order.data);
 ```
 
 ### Merchant Information
@@ -359,7 +344,7 @@ const response = await sdk.merchants.getFees('merchant-username', {
   currency: 'USD',
   total: 100
 });
-const fees = response.data;
+const fees = response.result;
 
 // Get merchant products
 const products = await sdk.merchants.getProducts('merchant-username', {
