@@ -1,0 +1,5528 @@
+openapi: 3.0.3
+info:
+  title: Inkress Commerce API
+  description: |
+    A comprehensive e-commerce API built with Phoenix/Elixir providing authentication, user management, 
+    product management, order processing, payment integration, and more.
+    
+    ## Authentication
+    This API uses Bearer token authentication. Include your token in the Authorization header:
+    `Authorization: Bearer <your_token>`
+    
+    ## Response Format
+    All responses follow a consistent format:
+    ```json
+    {
+      "state": "ok|error",
+      "data": {...},
+      "result": {...}
+    }
+    ```
+    
+  version: "1.0.0"
+  contact:
+    name: Inkress API Support
+    email: support@inkress.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.inkress.com
+    description: Production server
+  - url: https://staging-api.inkress.com
+    description: Staging server
+  - url: http://localhost:4000
+    description: Development server
+
+security:
+  - BearerAuth: []
+
+paths:
+  # Authentication endpoints
+  /api/v1/auth/register:
+    post:
+      tags: ["Authentication"]
+      summary: Register a new user
+      description: Create a new user account with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                password:
+                  type: string
+                  minLength: 8
+                  example: "securepassword123"
+                password_confirmation:
+                  type: string
+                  example: "securepassword123"
+                first_name:
+                  type: string
+                  example: "John"
+                last_name:
+                  type: string
+                  example: "Doe"
+                phone:
+                  type: string
+                  example: "+1234567890"
+      responses:
+        '201':
+          description: User successfully registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                state: "ok"
+                data:
+                  user:
+                    id: 1
+                    email: "user@example.com"
+                    first_name: "John"
+                    last_name: "Doe"
+                    uid: "usr_abc123"
+                    status: 32
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                state: "error"
+                data:
+                  errors:
+                    email: ["has already been taken"]
+
+  /api/v1/auth/login:
+    post:
+      tags: ["Authentication"]
+      summary: User login
+      description: Authenticate user with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                password:
+                  type: string
+                  example: "securepassword123"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                state: "ok"
+                data:
+                  user:
+                    id: 1
+                    email: "user@example.com"
+                    first_name: "John"
+                    last_name: "Doe"
+                  token: "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9..."
+        '422':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/login/confirm:
+    post:
+      tags: ["Authentication"]
+      summary: Confirm login with OTP
+      description: Confirm login using OTP (One-Time Password)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - otp_code
+              properties:
+                token:
+                  type: string
+                  example: "temp_token_abc123"
+                otp_code:
+                  type: string
+                  example: "123456"
+      responses:
+        '200':
+          description: OTP confirmed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '422':
+          description: Invalid OTP
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/logout:
+    delete:
+      tags: ["Authentication"]
+      summary: User logout
+      description: Logout the current user and invalidate token
+      responses:
+        '204':
+          description: Successfully logged out
+
+  /api/v1/auth/request_reset:
+    post:
+      tags: ["Authentication"]
+      summary: Request password reset
+      description: Send password reset email to user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+      responses:
+        '200':
+          description: Reset email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                state: "ok"
+                data:
+                  reason: "Reset Email Sent."
+        '422':
+          description: Email not found or error sending email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/reset:
+    post:
+      tags: ["Authentication"]
+      summary: Reset password
+      description: Reset user password using reset token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - password
+                - password_confirmation
+              properties:
+                token:
+                  type: string
+                  example: "reset_token_abc123"
+                password:
+                  type: string
+                  minLength: 8
+                  example: "newpassword123"
+                password_confirmation:
+                  type: string
+                  example: "newpassword123"
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '422':
+          description: Invalid token or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/valid:
+    get:
+      tags: ["Authentication"]
+      summary: Check if user session is valid
+      description: Validate current user session
+      responses:
+        '200':
+          description: Session is valid
+        '401':
+          description: Session is invalid or expired
+
+  /api/v1/tokens/validate:
+    post:
+      tags: ["Authentication"]
+      summary: Validate token
+      description: Validate an authentication token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  example: "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9..."
+      responses:
+        '200':
+          description: Token validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  state:
+                    type: string
+                    example: "ok"
+                  result:
+                    type: boolean
+                    example: true
+                  reason:
+                    type: string
+                    example: "token_expired"
+
+  # User Management
+  /api/v1/users:
+    get:
+      tags: ["Users"]
+      summary: List users
+      description: Get a paginated list of users with optional filtering. Any field from the user schema can be used as a query parameter for filtering.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of items per page
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search across email, first_name, last_name, and username fields
+        - name: email
+          in: query
+          schema:
+            type: string
+            format: email
+          description: Filter by email address
+        - name: first_name
+          in: query
+          schema:
+            type: string
+          description: Filter by first name
+        - name: last_name
+          in: query
+          schema:
+            type: string
+          description: Filter by last name
+        - name: phone
+          in: query
+          schema:
+            type: string
+          description: Filter by phone number
+        - name: username
+          in: query
+          schema:
+            type: string
+          description: Filter by username
+        - name: sex
+          in: query
+          schema:
+            type: integer
+          description: Filter by sex
+        - name: dob
+          in: query
+          schema:
+            type: integer
+          description: Filter by date of birth (timestamp)
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [email, first_name, last_name, username, created_at, updated_at]
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+          description: Sort order
+      responses:
+        '200':
+          description: Users retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/User'
+    post:
+      tags: ["Users"]
+      summary: Create user
+      description: Create a new user (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/users/{id}:
+    get:
+      tags: ["Users"]
+      summary: Get user by ID
+      description: Retrieve a specific user by their ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: ["Users"]
+      summary: Update user
+      description: Update user information
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: ["Users"]
+      summary: Delete user
+      description: Delete a user account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: User deleted successfully
+        '404':
+          description: User not found
+
+  /api/v1/users/membership:
+    post:
+      tags: ["Users"]
+      summary: Check user membership
+      description: Check user's organization and merchant memberships
+      responses:
+        '200':
+          description: Membership information retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/users/invite:
+    post:
+      tags: ["Users"]
+      summary: Invite user
+      description: Invite a new user to join the organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user
+              properties:
+                user:
+                  $ref: '#/components/schemas/UserInput'
+                role:
+                  type: string
+                  example: "admin"
+      responses:
+        '200':
+          description: User invited successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                state: "ok"
+                data:
+                  text: "User Added."
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/users/eject:
+    post:
+      tags: ["Users"]
+      summary: Remove user from organization
+      description: Remove a user from the current organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+              properties:
+                user_id:
+                  type: integer
+                  example: 123
+      responses:
+        '200':
+          description: User removed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                state: "ok"
+                data:
+                  text: "User Removed."
+        '422':
+          description: Error removing user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/users/validate:
+    post:
+      tags: ["Users"]
+      summary: Validate email
+      description: Validate an email address
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                source:
+                  type: string
+                  example: "registration"
+      responses:
+        '200':
+          description: Email validation result
+          content:
+            application/json:
+              schema:
+                type: object
+        '422':
+          description: Invalid email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Merchant Management
+  /api/v1/merchants:
+    get:
+      tags: ["Merchants"]
+      summary: List merchants
+      description: Get a paginated list of merchants
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Merchants retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Merchant'
+    post:
+      tags: ["Merchants"]
+      summary: Create merchant
+      description: Create a new merchant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantInput'
+      responses:
+        '201':
+          description: Merchant created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Merchant'
+
+  /api/v1/merchants/{id}:
+    get:
+      tags: ["Merchants"]
+      summary: Get merchant by ID
+      description: Retrieve a specific merchant by their ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Merchant retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Merchant'
+    put:
+      tags: ["Merchants"]
+      summary: Update merchant
+      description: Update merchant information
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantInput'
+      responses:
+        '200':
+          description: Merchant updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Merchant'
+    delete:
+      tags: ["Merchants"]
+      summary: Delete merchant
+      description: Delete a merchant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Merchant deleted successfully
+
+  /api/v1/merchants/invite:
+    post:
+      tags: ["Merchants"]
+      summary: Invite merchant admin
+      description: Invite a new merchant admin user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - merchant
+              properties:
+                merchant:
+                  $ref: '#/components/schemas/UserInput'
+      responses:
+        '200':
+          description: Merchant admin invited successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/merchants/account/{mode}:
+    post:
+      tags: ["Merchants"]
+      summary: Manage merchant account
+      description: Perform account management operations
+      parameters:
+        - name: mode
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [activate, deactivate, suspend]
+      responses:
+        '200':
+          description: Account operation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/merchants/account/{mode}/{id}:
+    post:
+      tags: ["Merchants"]
+      summary: Manage specific merchant account
+      description: Perform account management operations on a specific merchant
+      parameters:
+        - name: mode
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [activate, deactivate, suspend]
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Account operation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  # Public merchant endpoints
+  /api/v1/public/m/{merchant_username}/products:
+    get:
+      tags: ["Public", "Products"]
+      summary: List public merchant products
+      description: Get public products for a specific merchant
+      security: []
+      parameters:
+        - name: merchant_username
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/public/m/{merchant_username}/fees:
+    get:
+      tags: ["Public", "Merchants"]
+      summary: Get merchant fees
+      description: Get fee structure for a specific merchant
+      security: []
+      parameters:
+        - name: merchant_username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Fees retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/public/m/{merchant_username}/tokens:
+    get:
+      tags: ["Public", "Merchants"]
+      summary: Get merchant public tokens
+      description: Get public API tokens for a merchant
+      security: []
+      parameters:
+        - name: merchant_username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tokens retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/public/m/{merchant_username}/payment_methods:
+    get:
+      tags: ["Public", "Merchants"]
+      summary: Get merchant payment methods
+      description: Get available payment methods for a merchant
+      security: []
+      parameters:
+        - name: merchant_username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment methods retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/public/m:
+    get:
+      tags: ["Public", "Merchants"]
+      summary: Get merchant profile
+      description: Get public merchant profile information (name, logo, about, etc.)
+      security: []
+      parameters:
+        - name: username
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: 'domain.cname'
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Merchant profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PublicMerchant'
+        '404':
+          description: Merchant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Orders
+  /api/v1/orders/stats:
+    get:
+      tags: ["Orders"]
+      summary: Get order statistics
+      description: Get analytics and statistics for orders
+      responses:
+        '200':
+          description: Order statistics retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OrderStats'
+
+  /api/v1/orders/status/{id}:
+    get:
+      tags: ["Public", "Orders"]
+      summary: Get order status (public)
+      description: Get the basic status of an order (public endpoint)
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order status retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  state:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      result:
+                        type: string
+                      uid:
+                        type: string
+    post:
+      tags: ["Orders"]
+      summary: Get detailed order status
+      description: Get detailed status of an order (authenticated)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order status retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Order'
+        '404':
+          description: Order not found
+
+  /api/v1/orders/lynkify/{id}:
+    post:
+      tags: ["Orders"]
+      summary: Create Lynk payment link
+      description: Create a Lynk payment link for an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - lynk_id
+              properties:
+                lynk_id:
+                  type: string
+                  example: "lynk_abc123"
+      responses:
+        '200':
+          description: Payment link created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '422':
+          description: Error creating payment link
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/orders/place_method/{id}:
+    post:
+      tags: ["Orders"]
+      summary: Update order payment method
+      description: Update the payment method for an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - method_id
+              properties:
+                method_id:
+                  type: string
+                  example: "pm_abc123"
+      responses:
+        '200':
+          description: Payment method updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '422':
+          description: Error updating payment method
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Billing Subscriptions
+  /api/v1/billing_subscriptions/charge/{uid}:
+    post:
+      tags: ["Billing"]
+      summary: Charge subscription
+      description: Process a charge for a subscription
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+                  format: float
+                currency:
+                  type: string
+                  example: "USD"
+      responses:
+        '200':
+          description: Subscription charged successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/billing_subscriptions/link:
+    post:
+      tags: ["Billing"]
+      summary: Create subscription link
+      description: Create a payment link for subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - plan_id
+              properties:
+                plan_id:
+                  type: string
+                customer_id:
+                  type: integer
+                amount:
+                  type: number
+                  format: float
+      responses:
+        '200':
+          description: Subscription link created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/billing_subscriptions/{uid}/periods:
+    get:
+      tags: ["Billing"]
+      summary: Get subscription periods
+      description: Get billing periods for a subscription
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Subscription periods retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/billing_subscriptions/{id}/cancel/{code}:
+    post:
+      tags: ["Public", "Billing"]
+      summary: Cancel subscription
+      description: Cancel a subscription with cancellation code
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Subscription cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  # Payments
+  /api/v1/payments/result/{order_id}:
+    get:
+      tags: ["Payments"]
+      summary: Get payment result
+      description: Get payment result/receipt for an order
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment result retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/payments/invoice/{id}:
+    get:
+      tags: ["Payments"]
+      summary: Get payment invoice
+      description: Get invoice for a payment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Invoice retrieved
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /api/v1/payments/invoice/{id}/{method_id}:
+    get:
+      tags: ["Payments"]
+      summary: Get payment invoice with method
+      description: Get invoice for a payment with specific payment method
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: method_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Invoice retrieved
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /api/v1/payments/exchange/{from}/{to}:
+    get:
+      tags: ["Payments"]
+      summary: Get exchange rate
+      description: Get currency exchange rate
+      parameters:
+        - name: from
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "USD"
+        - name: to
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "JMD"
+      responses:
+        '200':
+          description: Exchange rate retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/payments/transactions:
+    post:
+      tags: ["Payments"]
+      summary: Process transaction
+      description: Process a payment transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+                - currency
+                - payment_method
+              properties:
+                amount:
+                  type: number
+                  format: float
+                  example: 100.00
+                currency:
+                  type: string
+                  example: "USD"
+                payment_method:
+                  type: string
+                  example: "stripe"
+                order_id:
+                  type: string
+                customer_id:
+                  type: integer
+      responses:
+        '200':
+          description: Transaction processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  # Payment Links
+  /api/v1/payments/link/{uid}:
+    post:
+      tags: ["Payments"]
+      summary: Process payment link
+      description: Process payment through a payment link
+      security: []
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                payment_method:
+                  type: string
+                amount:
+                  type: number
+                  format: float
+      responses:
+        '200':
+          description: Payment processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/payments/link/{uid}/session:
+    post:
+      tags: ["Payments"]
+      summary: Create payment session
+      description: Create a payment session for a payment link
+      security: []
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                return_url:
+                  type: string
+                  example: "https://example.com/success"
+                cancel_url:
+                  type: string
+                  example: "https://example.com/cancel"
+      responses:
+        '200':
+          description: Payment session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  # Payment Webhooks and Logs
+  /api/v1/payments/log:
+    get:
+      tags: ["Payments"]
+      summary: Get payment logs
+      description: Retrieve payment processing logs
+      responses:
+        '200':
+          description: Payment logs retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    post:
+      tags: ["Payments"]
+      summary: Create payment log
+      description: Create a payment processing log entry
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Log entry created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/payments/log/emails/fygaro:
+    post:
+      tags: ["Webhooks", "Payments"]
+      summary: Fygaro email webhook
+      description: Webhook endpoint for Fygaro email notifications
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+                - plain_body
+              properties:
+                id:
+                  type: string
+                plain_body:
+                  type: string
+      responses:
+        '200':
+          description: Webhook processed
+
+  /api/v1/payments/log/wipay:
+    get:
+      tags: ["Webhooks", "Payments"]
+      summary: WiPay webhook (GET)
+      description: WiPay webhook endpoint (GET method)
+      security: []
+      parameters:
+        - name: order_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Webhook processed
+    post:
+      tags: ["Webhooks", "Payments"]
+      summary: WiPay webhook (POST)
+      description: WiPay webhook endpoint (POST method)
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - order_id
+              properties:
+                order_id:
+                  type: string
+      responses:
+        '200':
+          description: Webhook processed
+
+  /api/v1/payments/log/lynk:
+    post:
+      tags: ["Webhooks", "Payments"]
+      summary: Lynk webhook
+      description: Webhook endpoint for Lynk payment notifications
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed
+
+  /api/v1/payments/log/ach:
+    post:
+      tags: ["Webhooks", "Payments"]
+      summary: ACH webhook
+      description: Webhook endpoint for ACH payment notifications
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed
+
+  /api/v1/payments/log/stripe/{order_id}/{session_id}:
+    get:
+      tags: ["Webhooks", "Payments"]
+      summary: Stripe webhook (GET)
+      description: Stripe webhook endpoint (GET method)
+      security: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Webhook processed
+    post:
+      tags: ["Webhooks", "Payments"]
+      summary: Stripe webhook (POST)
+      description: Stripe webhook endpoint (POST method)
+      security: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed
+
+  # Posts/Content Management
+  /api/v1/posts/pubload:
+    post:
+      tags: ["Content", "Posts"]
+      summary: Public post upload
+      description: Upload content publicly (no authentication required)
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: "My Blog Post"
+                description:
+                  type: string
+                  example: "This is a blog post description"
+                content:
+                  type: string
+                  example: "Full post content here..."
+                image:
+                  type: string
+                  example: "https://example.com/image.jpg"
+                kind:
+                  type: integer
+                  example: 1
+                data:
+                  type: object
+      responses:
+        '201':
+          description: Post created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      result:
+                        $ref: '#/components/schemas/Post'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # File Management
+  /api/v1/files/pubload:
+    post:
+      tags: ["Files"]
+      summary: Public file upload
+      description: Upload files publicly (no authentication required)
+      security: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                name:
+                  type: string
+                  example: "document.pdf"
+                record:
+                  type: string
+                  example: "posts"
+                record_id:
+                  type: integer
+                  example: 123
+      responses:
+        '201':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      result:
+                        $ref: '#/components/schemas/File'
+
+  # Configuration
+  /api/v1/config/{type}:
+    get:
+      tags: ["Configuration"]
+      summary: List configuration items
+      description: Get configuration items by type
+      security: []
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "payment_providers"
+      responses:
+        '200':
+          description: Configuration items retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      result:
+                        type: object
+                        properties:
+                          entries:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                name:
+                                  type: string
+
+  /api/v1/config/get/{id}:
+    get:
+      tags: ["Configuration"]
+      summary: Get configuration
+      description: Get configuration for a specific merchant
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Merchant ID
+      responses:
+        '201':
+          description: Configuration retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      result:
+                        type: object
+
+  /api/v1/config/set/{id}:
+    post:
+      tags: ["Configuration"]
+      summary: Set configuration
+      description: Set configuration for a specific merchant
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Merchant ID
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Configuration saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '422':
+          description: Configuration too large or other error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Static Locations
+  /api/v1/static-locations:
+    get:
+      tags: ["Locations"]
+      summary: Get static locations
+      description: Get static location data (restaurants, gas stations, etc.)
+      security: []
+      parameters:
+        - name: place_ids
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+        - name: kind
+          in: query
+          schema:
+            type: string
+            enum: [restaurant, gas_station]
+      responses:
+        '200':
+          description: Locations retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      result:
+                        type: object
+                        properties:
+                          entries:
+                            type: array
+                            items:
+                              type: object
+    post:
+      tags: ["Locations"]
+      summary: Create/update static locations
+      description: Create or update static location data
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                place_ids:
+                  type: array
+                  items:
+                    type: string
+                kind:
+                  type: string
+      responses:
+        '200':
+          description: Locations updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/static-locations/{place_id}:
+    post:
+      tags: ["Locations"]
+      summary: Update station price
+      description: Update price information for a gas station
+      security: []
+      parameters:
+        - name: place_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                price:
+                  type: number
+                  format: float
+                fuel_type:
+                  type: string
+      responses:
+        '200':
+          description: Price updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '422':
+          description: Update failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Public Lists
+  /api/v1/public/{secret}/merchants:
+    get:
+      tags: ["Public"]
+      summary: List merchants (public with secret)
+      description: Get public list of merchants with secret access
+      security: []
+      parameters:
+        - name: secret
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "inknull"
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Merchants retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/public/{secret}/users:
+    get:
+      tags: ["Public"]
+      summary: List users (public with secret)
+      description: Get public list of users with secret access
+      security: []
+      parameters:
+        - name: secret
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "inknull"
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Users retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  # SMS and Email Webhooks
+  /api/v1/hooks/sms/signal:
+    get:
+      tags: ["Webhooks"]
+      summary: SMS signal webhook (GET)
+      description: SMS signal webhook endpoint
+      security: []
+      responses:
+        '200':
+          description: Webhook processed
+    post:
+      tags: ["Webhooks"]
+      summary: SMS signal webhook (POST)
+      description: SMS signal webhook endpoint
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed
+
+  /api/v1/hooks/smtp/signal:
+    post:
+      tags: ["Webhooks"]
+      summary: SMTP signal webhook
+      description: SMTP signal webhook endpoint
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed
+
+  /api/v1/hooks/exchange/signal/{from}/{to}:
+    get:
+      tags: ["Webhooks", "Exchange"]
+      summary: Exchange rate signal
+      description: Exchange rate signal webhook
+      security: []
+      parameters:
+        - name: from
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Exchange rate retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  # Inventory Management
+  /api/v1/products:
+    get:
+      tags: ["Inventory"]
+      summary: List products
+      description: Retrieve a list of products with optional filtering and pagination. Any field from the product schema can be used as a query parameter for filtering.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of items per page
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search across title, teaser, and description fields
+        - name: title
+          in: query
+          schema:
+            type: string
+          description: Filter by product title
+        - name: teaser
+          in: query
+          schema:
+            type: string
+          description: Filter by product teaser
+        - name: description
+          in: query
+          schema:
+            type: string
+          description: Filter by product description
+        - name: price
+          in: query
+          schema:
+            type: number
+            format: float
+          description: Filter by exact price
+        - name: price_min
+          in: query
+          schema:
+            type: number
+            format: float
+          description: Filter by minimum price
+        - name: price_max
+          in: query
+          schema:
+            type: number
+            format: float
+          description: Filter by maximum price
+        - name: currency_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by currency ID
+        - name: permalink
+          in: query
+          schema:
+            type: string
+          description: Filter by permalink
+        - name: public
+          in: query
+          schema:
+            type: boolean
+          description: Filter by public status
+        - name: unlimited
+          in: query
+          schema:
+            type: boolean
+          description: Filter by unlimited availability
+        - name: status
+          in: query
+          schema:
+            type: integer
+          description: Filter by status code
+        - name: tag_ids
+          in: query
+          schema:
+            type: array
+            items:
+              type: integer
+          description: Filter by tag IDs
+        - name: units_remaining
+          in: query
+          schema:
+            type: integer
+          description: Filter by units remaining
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by category ID
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [title, price, created_at, updated_at, units_remaining]
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+          description: Sort order
+      responses:
+        '200':
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    post:
+      tags: ["Inventory"]
+      summary: Create product
+      description: Create a new product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductInput'
+      responses:
+        '201':
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/products/{id}:
+    get:
+      tags: ["Inventory"]
+      summary: Get product by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: ["Inventory"]
+      summary: Update product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductInput'
+      responses:
+        '200':
+          description: Product updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: ["Inventory"]
+      summary: Delete product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Product deleted successfully
+        '404':
+          description: Product not found
+
+  /api/v1/product_variants:
+    get:
+      tags: ["Inventory"]
+      summary: List product variants
+      description: Retrieve a list of product variants with optional filtering. Any field from the product variant schema can be used as a query parameter for filtering.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of items per page
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search across title and SKU fields
+        - name: product_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by product ID
+        - name: title
+          in: query
+          schema:
+            type: string
+          description: Filter by variant title
+        - name: price
+          in: query
+          schema:
+            type: number
+            format: float
+          description: Filter by exact price
+        - name: price_min
+          in: query
+          schema:
+            type: number
+            format: float
+          description: Filter by minimum price
+        - name: price_max
+          in: query
+          schema:
+            type: number
+            format: float
+          description: Filter by maximum price
+        - name: sku
+          in: query
+          schema:
+            type: string
+          description: Filter by SKU
+        - name: status
+          in: query
+          schema:
+            type: integer
+          description: Filter by status code
+        - name: unlimited
+          in: query
+          schema:
+            type: boolean
+          description: Filter by unlimited availability
+        - name: units_remaining
+          in: query
+          schema:
+            type: integer
+          description: Filter by units remaining
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [title, price, sku, created_at, updated_at, units_remaining]
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+          description: Sort order
+      responses:
+        '200':
+          description: Product variants retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    post:
+      tags: ["Inventory"]
+      summary: Create product variant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductVariantInput'
+      responses:
+        '201':
+          description: Product variant created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/product_variants/{id}:
+    get:
+      tags: ["Inventory"]
+      summary: Get product variant by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product variant retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    put:
+      tags: ["Inventory"]
+      summary: Update product variant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductVariantInput'
+      responses:
+        '200':
+          description: Product variant updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    delete:
+      tags: ["Inventory"]
+      summary: Delete product variant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Product variant deleted successfully
+
+  /api/v1/product_tags:
+    get:
+      tags: ["Inventory"]
+      summary: List product tags
+      description: Retrieve a list of product tags with optional filtering. Any field from the product tag schema can be used as a query parameter for filtering.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of items per page
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search across name and description fields
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: Filter by tag name
+        - name: description
+          in: query
+          schema:
+            type: string
+          description: Filter by tag description
+        - name: color
+          in: query
+          schema:
+            type: string
+          description: Filter by tag color
+        - name: status
+          in: query
+          schema:
+            type: integer
+          description: Filter by tag status
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [name, status, created_at, updated_at]
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+          description: Sort order
+      responses:
+        '200':
+          description: Product tags retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    post:
+      tags: ["Inventory"]
+      summary: Create product tag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductTagInput'
+      responses:
+        '201':
+          description: Product tag created successfully
+
+  /api/v1/product_tags/{id}:
+    get:
+      tags: ["Inventory"]
+      summary: Get product tag by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product tag retrieved successfully
+    put:
+      tags: ["Inventory"]
+      summary: Update product tag
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductTagInput'
+      responses:
+        '200':
+          description: Product tag updated successfully
+    delete:
+      tags: ["Inventory"]
+      summary: Delete product tag
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Product tag deleted successfully
+
+  /api/v1/categories:
+    get:
+      tags: ["Inventory"]
+      summary: List categories
+      description: Retrieve a list of categories with optional filtering. Any field from the category schema can be used as a query parameter for filtering.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of items per page
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search across name and description fields
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: Filter by category name
+        - name: description
+          in: query
+          schema:
+            type: string
+          description: Filter by category description
+        - name: kind
+          in: query
+          schema:
+            type: integer
+          description: Filter by category kind/type
+        - name: kind_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by kind ID
+        - name: parent_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by parent category ID
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [name, kind, created_at, updated_at]
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+          description: Sort order
+      responses:
+        '200':
+          description: Categories retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    post:
+      tags: ["Inventory"]
+      summary: Create category
+      description: Create a new category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryInput'
+      responses:
+        '201':
+          description: Category created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/categories/{id}:
+    get:
+      tags: ["Inventory"]
+      summary: Get category by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Category retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: ["Inventory"]
+      summary: Update category
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryInput'
+      responses:
+        '200':
+          description: Category updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: ["Inventory"]
+      summary: Delete category
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Category deleted successfully
+        '404':
+          description: Category not found
+
+  # Checkout & Cart Management
+  /api/v1/carts:
+    get:
+      tags: ["Checkout"]
+      summary: List carts
+      description: Retrieve a list of carts with optional filtering. Any field from the cart schema can be used as a query parameter for filtering.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of items per page
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by user ID
+        - name: session_id
+          in: query
+          schema:
+            type: string
+          description: Filter by session ID
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_at, updated_at, user_id]
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort order
+      responses:
+        '200':
+          description: Carts retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    post:
+      tags: ["Checkout"]
+      summary: Create cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartInput'
+      responses:
+        '201':
+          description: Cart created successfully
+
+  /api/v1/carts/{id}:
+    get:
+      tags: ["Checkout"]
+      summary: Get cart by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cart retrieved successfully
+    put:
+      tags: ["Checkout"]
+      summary: Update cart
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartInput'
+      responses:
+        '200':
+          description: Cart updated successfully
+    delete:
+      tags: ["Checkout"]
+      summary: Delete cart
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Cart deleted successfully
+
+  # Delivery & Shipping
+  /api/v1/shipping_methods:
+    get:
+      tags: ["Delivery"]
+      summary: List shipping methods
+      description: Retrieve a list of shipping methods with optional filtering. Any field from the shipping method schema can be used as a query parameter for filtering.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Shipping methods retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ShippingMethodInput'
+    post:
+      tags: ["Delivery"]
+      summary: Create shipping method
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShippingMethodInput'
+      responses:
+        '201':
+          description: Shipping method created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ShippingMethodInput'
+
+  /api/v1/shipping_methods/{id}:
+    get:
+      tags: ["Delivery"]
+      summary: Get shipping method by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Shipping method retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ShippingMethodInput'
+    put:
+      tags: ["Delivery"]
+      summary: Update shipping method
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShippingMethodInput'
+      responses:
+        '200':
+          description: Shipping method updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ShippingMethodInput'
+    delete:
+      tags: ["Delivery"]
+      summary: Delete shipping method
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Shipping method deleted successfully
+
+  /api/v1/shipping_areas:
+    get:
+      tags: ["Delivery"]
+      summary: List shipping areas
+      responses:
+        '200':
+          description: Shipping areas retrieved successfully
+    post:
+      tags: ["Delivery"]
+      summary: Create shipping area
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShippingAreaInput'
+      responses:
+        '201':
+          description: Shipping area created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/shipping_areas/{id}:
+    get:
+      tags: ["Delivery"]
+      summary: Get shipping area by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Shipping area retrieved successfully
+    put:
+      tags: ["Delivery"]
+      summary: Update shipping area
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShippingAreaInput'
+      responses:
+        '200':
+          description: Shipping area updated successfully
+    delete:
+      tags: ["Delivery"]
+      summary: Delete shipping area
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Shipping area deleted successfully
+
+  # Payment Methods
+  /api/v1/payment_methods:
+    get:
+      tags: ["Payments"]
+      summary: List payment methods
+      responses:
+        '200':
+          description: Payment methods retrieved successfully
+    post:
+      tags: ["Payments"]
+      summary: Create payment method
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentMethodInput'
+      responses:
+        '201':
+          description: Payment method created successfully
+
+  /api/v1/payment_methods/{id}:
+    get:
+      tags: ["Payments"]
+      summary: Get payment method by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment method retrieved successfully
+    put:
+      tags: ["Payments"]
+      summary: Update payment method
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentMethodInput'
+      responses:
+        '200':
+          description: Payment method updated successfully
+    delete:
+      tags: ["Payments"]
+      summary: Delete payment method
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Payment method deleted successfully
+
+  # Billing & Subscriptions
+  /api/v1/subscriptions:
+    get:
+      tags: ["Billing"]
+      summary: List subscriptions
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, cancelled, expired, pending]
+      responses:
+        '200':
+          description: Subscriptions retrieved successfully
+    post:
+      tags: ["Billing"]
+      summary: Create subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionInput'
+      responses:
+        '201':
+          description: Subscription created successfully
+
+  /api/v1/subscriptions/{id}:
+    get:
+      tags: ["Billing"]
+      summary: Get subscription by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Subscription retrieved successfully
+    put:
+      tags: ["Billing"]
+      summary: Update subscription
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionInput'
+      responses:
+        '200':
+          description: Subscription updated successfully
+    delete:
+      tags: ["Billing"]
+      summary: Cancel subscription
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Subscription cancelled successfully
+
+  /api/v1/plans:
+    get:
+      tags: ["Billing"]
+      summary: List billing plans
+      responses:
+        '200':
+          description: Plans retrieved successfully
+    post:
+      tags: ["Billing"]
+      summary: Create billing plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanInput'
+      responses:
+        '201':
+          description: Plan created successfully
+
+  /api/v1/plans/{id}:
+    get:
+      tags: ["Billing"]
+      summary: Get plan by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Plan retrieved successfully
+    put:
+      tags: ["Billing"]
+      summary: Update plan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanInput'
+      responses:
+        '200':
+          description: Plan updated successfully
+    delete:
+      tags: ["Billing"]
+      summary: Delete plan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Plan deleted successfully
+
+  # Generics
+  /api/v1/generis:
+      get:
+        tags: ["Assets"]
+        summary: List Generics
+        description: Retrieve a list of generics with optional filtering. Any field from the generics schema can be used as a query parameter for filtering.
+        parameters:
+          - name: page
+            in: query
+            schema:
+              type: integer
+              default: 1
+            description: Page number for pagination
+          - name: limit
+            in: query
+            schema:
+              type: integer
+              default: 20
+            description: Number of items per page
+          - name: key
+            in: query
+            schema:
+              type: string
+            description: Filter by key
+          - name: kind
+            in: query
+            schema:
+              type: string
+            description: Filter by kind
+          - name: sort
+            in: query
+            schema:
+              type: string
+              enum: [name, size, created_at, updated_at, content_type]
+            description: Sort field
+          - name: order
+            in: query
+            schema:
+              type: string
+              enum: [asc, desc]
+              default: desc
+            description: Sort order
+        responses:
+          '200':
+            description: Generics retrieved successfully
+      post:
+        tags: ["Assets"]
+        summary: Create generic
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericInput'
+        responses:
+          '201':
+            description: Generic created successfully
+
+  /api/v1/generics/{id}:
+    get:
+      tags: ["Assets"]
+      summary: Get generic by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Generic retrieved successfully
+    put:
+      tags: ["Assets"]
+      summary: Update generic data
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericInput'
+      responses:
+        '200':
+          description: Generic updated successfully
+    delete:
+      tags: ["Assets"]
+      summary: Delete generic
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Generic deleted successfully
+
+
+  # Assets & Files
+  /api/v1/files:
+    get:
+      tags: ["Assets"]
+      summary: List files
+      description: Retrieve a list of files with optional filtering. Any field from the file schema can be used as a query parameter for filtering.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of items per page
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: Filter by file name
+        - name: content_type
+          in: query
+          schema:
+            type: string
+          description: Filter by content type (MIME type)
+        - name: file_type
+          in: query
+          schema:
+            type: string
+            enum: [image, document, video, audio]
+          description: Filter by file type category
+        - name: record
+          in: query
+          schema:
+            type: string
+          description: Filter by record type
+        - name: record_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by record ID
+        - name: kind
+          in: query
+          schema:
+            type: integer
+          description: Filter by file kind
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by user ID who uploaded the file
+        - name: size_min
+          in: query
+          schema:
+            type: integer
+          description: Filter by minimum file size in bytes
+        - name: size_max
+          in: query
+          schema:
+            type: integer
+          description: Filter by maximum file size in bytes
+        - name: width_min
+          in: query
+          schema:
+            type: integer
+          description: Filter by minimum width (for images)
+        - name: width_max
+          in: query
+          schema:
+            type: integer
+          description: Filter by maximum width (for images)
+        - name: height_min
+          in: query
+          schema:
+            type: integer
+          description: Filter by minimum height (for images)
+        - name: height_max
+          in: query
+          schema:
+            type: integer
+          description: Filter by maximum height (for images)
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [name, size, created_at, updated_at, content_type]
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort order
+      responses:
+        '200':
+          description: Files retrieved successfully
+    post:
+      tags: ["Assets"]
+      summary: Upload file
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: File uploaded successfully
+
+  /api/v1/files/{id}:
+    get:
+      tags: ["Assets"]
+      summary: Get file by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File retrieved successfully
+    put:
+      tags: ["Assets"]
+      summary: Update file metadata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileInput'
+      responses:
+        '200':
+          description: File updated successfully
+    delete:
+      tags: ["Assets"]
+      summary: Delete file
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: File deleted successfully
+
+  # Appointment System
+  /api/v1/bookings:
+    get:
+      tags: ["Appointments"]
+      summary: List bookings
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, cancelled, completed]
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Bookings retrieved successfully
+    post:
+      tags: ["Appointments"]
+      summary: Create booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingInput'
+      responses:
+        '201':
+          description: Booking created successfully
+
+  /api/v1/bookings/{id}:
+    get:
+      tags: ["Appointments"]
+      summary: Get booking by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Booking retrieved successfully
+    put:
+      tags: ["Appointments"]
+      summary: Update booking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingInput'
+      responses:
+        '200':
+          description: Booking updated successfully
+    delete:
+      tags: ["Appointments"]
+      summary: Cancel booking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Booking cancelled successfully
+
+  # Organizations
+  /api/v1/organisations:
+    get:
+      tags: ["Organizations"]
+      summary: List organizations
+      description: Retrieve a list of organizations with optional filtering. Any field from the organization schema can be used as a query parameter for filtering.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of items per page
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search across name, description, email fields
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: Filter by organization name
+        - name: description
+          in: query
+          schema:
+            type: string
+          description: Filter by description
+        - name: website
+          in: query
+          schema:
+            type: string
+          description: Filter by website URL
+        - name: email
+          in: query
+          schema:
+            type: string
+            format: email
+          description: Filter by email address
+        - name: phone
+          in: query
+          schema:
+            type: string
+          description: Filter by phone number
+        - name: address
+          in: query
+          schema:
+            type: string
+          description: Filter by address
+        - name: status
+          in: query
+          schema:
+            type: integer
+          description: Filter by status code
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [name, email, created_at, updated_at, status]
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+          description: Sort order
+      responses:
+        '200':
+          description: Organizations retrieved successfully
+    post:
+      tags: ["Organizations"]
+      summary: Create organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganisationInput'
+      responses:
+        '201':
+          description: Organization created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/organisations/{id}:
+    get:
+      tags: ["Organizations"]
+      summary: Get organization by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Organization retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OrganisationInput'
+    put:
+      tags: ["Organizations"]
+      summary: Update organization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganisationInput'
+      responses:
+        '200':
+          description: Organization updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: ["Organizations"]
+      summary: Delete organization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Organization deleted successfully
+
+  # Feedback & Reviews
+  /api/v1/reviews:
+    get:
+      tags: ["Feedback"]
+      summary: List reviews
+      description: Retrieve a list of reviews with optional filtering. Any field from the review schema can be used as a query parameter for filtering.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of items per page
+        - name: product_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by product ID
+        - name: order_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by order ID
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by user ID
+        - name: rating
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+          description: Filter by rating value
+        - name: rating_min
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+          description: Filter by minimum rating
+        - name: rating_max
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+          description: Filter by maximum rating
+        - name: comment
+          in: query
+          schema:
+            type: string
+          description: Filter by comment content
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [rating, created_at, updated_at]
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort order
+      responses:
+        '200':
+          description: Reviews retrieved successfully
+    post:
+      tags: ["Feedback"]
+      summary: Create review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewInput'
+      responses:
+        '201':
+          description: Review created successfully
+
+  /api/v1/reviews/{id}:
+    get:
+      tags: ["Feedback"]
+      summary: Get review by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Review retrieved successfully
+    put:
+      tags: ["Feedback"]
+      summary: Update review
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewInput'
+      responses:
+        '200':
+          description: Review updated successfully
+    delete:
+      tags: ["Feedback"]
+      summary: Delete review
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Review deleted successfully
+
+  # Notification System
+  /api/v1/notifications:
+    get:
+      tags: ["Notifications"]
+      summary: List notifications
+      description: Retrieve a list of notifications with optional filtering. Any field from the notification schema can be used as a query parameter for filtering.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of items per page
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by user ID
+        - name: title
+          in: query
+          schema:
+            type: string
+          description: Filter by notification title
+        - name: message
+          in: query
+          schema:
+            type: string
+          description: Filter by notification message
+        - name: type
+          in: query
+          schema:
+            type: string
+          description: Filter by notification type
+        - name: priority
+          in: query
+          schema:
+            type: string
+            enum: [low, normal, high, urgent]
+          description: Filter by priority level
+        - name: read
+          in: query
+          schema:
+            type: boolean
+          description: Filter by read status
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_at, updated_at, priority, type, title]
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort order
+      responses:
+        '200':
+          description: Notifications retrieved successfully
+    post:
+      tags: ["Notifications"]
+      summary: Create notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationInput'
+      responses:
+        '201':
+          description: Notification created successfully
+
+  /api/v1/notifications/{id}:
+    get:
+      tags: ["Notifications"]
+      summary: Get notification by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Notification retrieved successfully
+    put:
+      tags: ["Notifications"]
+      summary: Update notification (mark as read/unread)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                read:
+                  type: boolean
+      responses:
+        '200':
+          description: Notification updated successfully
+    delete:
+      tags: ["Notifications"]
+      summary: Delete notification
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Notification deleted successfully
+
+  # Currency & Money
+  /api/v1/currencies:
+    get:
+      tags: ["Financial"]
+      summary: List currencies
+      description: Retrieve a list of currencies with optional filtering. Any field from the currency schema can be used as a query parameter for filtering.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of items per page
+        - name: code
+          in: query
+          schema:
+            type: string
+          description: Filter by currency code (e.g., USD, EUR)
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: Filter by currency name
+        - name: symbol
+          in: query
+          schema:
+            type: string
+          description: Filter by currency symbol
+        - name: decimal_places
+          in: query
+          schema:
+            type: integer
+          description: Filter by decimal places
+        - name: active
+          in: query
+          schema:
+            type: boolean
+          description: Filter by active status
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [code, name, created_at, updated_at]
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+          description: Sort order
+      responses:
+        '200':
+          description: Currencies retrieved successfully
+    post:
+      tags: ["Financial"]
+      summary: Create currency
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CurrencyInput'
+      responses:
+        '201':
+          description: Currency created successfully
+
+  /api/v1/currencies/{id}:
+    get:
+      tags: ["Financial"]
+      summary: Get currency by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Currency retrieved successfully
+    put:
+      tags: ["Financial"]
+      summary: Update currency
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CurrencyInput'
+      responses:
+        '200':
+          description: Currency updated successfully
+
+  /api/v1/exchange_rates:
+    get:
+      tags: ["Financial"]
+      summary: List exchange rates
+      parameters:
+        - name: from_currency
+          in: query
+          schema:
+            type: string
+        - name: to_currency
+          in: query
+          schema:
+            type: string
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Exchange rates retrieved successfully
+    post:
+      tags: ["Financial"]
+      summary: Create exchange rate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeRateInput'
+      responses:
+        '201':
+          description: Exchange rate created successfully
+
+  # Ledger & Transactions
+  /api/v1/transactions:
+    get:
+      tags: ["Financial"]
+      summary: List transactions
+      description: Retrieve a list of transactions with optional filtering. Any field from the transaction schema can be used as a query parameter for filtering.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of items per page
+        - name: amount
+          in: query
+          schema:
+            type: number
+            format: float
+          description: Filter by exact amount
+        - name: amount_min
+          in: query
+          schema:
+            type: number
+            format: float
+          description: Filter by minimum amount
+        - name: amount_max
+          in: query
+          schema:
+            type: number
+            format: float
+          description: Filter by maximum amount
+        - name: currency
+          in: query
+          schema:
+            type: string
+          description: Filter by currency code
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [debit, credit]
+          description: Filter by transaction type
+        - name: description
+          in: query
+          schema:
+            type: string
+          description: Filter by description
+        - name: reference_id
+          in: query
+          schema:
+            type: string
+          description: Filter by reference ID
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter transactions from this date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter transactions to this date
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [amount, created_at, updated_at, currency, type]
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort order
+      responses:
+        '200':
+          description: Transactions retrieved successfully
+    post:
+      tags: ["Financial"]
+      summary: Create transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionInput'
+      responses:
+        '201':
+          description: Transaction created successfully
+
+  /api/v1/transactions/{id}:
+    get:
+      tags: ["Financial"]
+      summary: Get transaction by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transaction retrieved successfully
+
+  /api/v1/balances:
+    get:
+      tags: ["Financial"]
+      summary: List account balances
+      parameters:
+        - name: account_id
+          in: query
+          schema:
+            type: string
+        - name: currency
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Balances retrieved successfully
+
+  # KYC & Verification
+  /api/v1/kyc_requests:
+    get:
+      tags: ["KYC"]
+      summary: List KYC requests
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected, under_review]
+      responses:
+        '200':
+          description: KYC requests retrieved successfully
+    post:
+      tags: ["KYC"]
+      summary: Create KYC request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KYCRequestInput'
+      responses:
+        '201':
+          description: KYC request created successfully
+
+  /api/v1/kyc_requests/{id}:
+    get:
+      tags: ["KYC"]
+      summary: Get KYC request by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: KYC request retrieved successfully
+    put:
+      tags: ["KYC"]
+      summary: Update KYC request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KYCRequestInput'
+      responses:
+        '200':
+          description: KYC request updated successfully
+
+  # Authentication & Authorization
+  /api/v1/roles:
+    get:
+      tags: ["Auth"]
+      summary: List roles
+      responses:
+        '200':
+          description: Roles retrieved successfully
+    post:
+      tags: ["Auth"]
+      summary: Create role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleInput'
+      responses:
+        '201':
+          description: Role created successfully
+
+  /api/v1/roles/{id}:
+    get:
+      tags: ["Auth"]
+      summary: Get role by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Role retrieved successfully
+    put:
+      tags: ["Auth"]
+      summary: Update role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleInput'
+      responses:
+        '200':
+          description: Role updated successfully
+    delete:
+      tags: ["Auth"]
+      summary: Delete role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Role deleted successfully
+
+  /api/v1/permissions:
+    get:
+      tags: ["Auth"]
+      summary: List permissions
+      responses:
+        '200':
+          description: Permissions retrieved successfully
+    post:
+      tags: ["Auth"]
+      summary: Create permission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionInput'
+      responses:
+        '201':
+          description: Permission created successfully
+
+  /api/v1/permissions/{id}:
+    get:
+      tags: ["Auth"]
+      summary: Get permission by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Permission retrieved successfully
+    put:
+      tags: ["Auth"]
+      summary: Update permission
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionInput'
+      responses:
+        '200':
+          description: Permission updated successfully
+    delete:
+      tags: ["Auth"]
+      summary: Delete permission
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Permission deleted successfully
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: [ok, error]
+          example: "ok"
+        data:
+          type: object
+        result:
+          type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: [error]
+          example: "error"
+        data:
+          type: object
+          properties:
+            errors:
+              type: object
+            reason:
+              type: string
+            text:
+              type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        first_name:
+          type: string
+          example: "John"
+        last_name:
+          type: string
+          example: "Doe"
+        phone:
+          type: string
+          example: "+1234567890"
+        uid:
+          type: string
+          example: "usr_abc123"
+        username:
+          type: string
+          example: "johndoe"
+        image:
+          type: string
+          example: "https://example.com/avatar.jpg"
+        sex:
+          type: integer
+          description: "Gender (1=male, 2=female, 3=other)"
+          example: 1
+        dob:
+          type: integer
+          description: "Date of birth as Unix timestamp"
+          example: 694224000
+        level:
+          type: integer
+          description: "User level/tier"
+          example: 1
+        status:
+          type: integer
+          description: "Account status"
+          example: 32
+        inserted_at:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00Z"
+
+    UserInput:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        password:
+          type: string
+          minLength: 8
+          example: "securepassword123"
+        password_confirmation:
+          type: string
+          example: "securepassword123"
+        first_name:
+          type: string
+          example: "John"
+        last_name:
+          type: string
+          example: "Doe"
+        phone:
+          type: string
+          example: "+1234567890"
+        username:
+          type: string
+          example: "johndoe"
+        image:
+          type: string
+          example: "https://example.com/avatar.jpg"
+        sex:
+          type: integer
+          example: 1
+        dob:
+          type: integer
+          example: 694224000
+
+    Merchant:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Acme Corp"
+        email:
+          type: string
+          format: email
+          example: "contact@acme.com"
+        phone:
+          type: string
+          example: "+1234567890"
+        username:
+          type: string
+          example: "acme"
+        website:
+          type: string
+          example: "https://acme.com"
+        logo:
+          type: string
+          example: "https://example.com/logo.jpg"
+        about:
+          type: string
+          example: "We are Acme Corp"
+        business_type:
+          type: string
+          example: "retail"
+        timezone:
+          type: string
+          example: "America/New_York"
+        status:
+          type: integer
+          example: 33
+        data:
+          type: object
+        inserted_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    MerchantInput:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          example: "Acme Corp"
+        email:
+          type: string
+          format: email
+          example: "contact@acme.com"
+        phone:
+          type: string
+          example: "+1234567890"
+        username:
+          type: string
+          example: "acme"
+        website:
+          type: string
+          example: "https://acme.com"
+        logo:
+          type: string
+          example: "https://example.com/logo.jpg"
+        about:
+          type: string
+          example: "We are Acme Corp"
+        business_type:
+          type: string
+          example: "retail"
+        timezone:
+          type: string
+          example: "America/New_York"
+        data:
+          type: object
+
+    PublicMerchant:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Acme Corp"
+        username:
+          type: string
+          example: "acme"
+        about:
+          type: string
+          example: "We are Acme Corp"
+        logo:
+          type: string
+          example: "https://example.com/logo.jpg"
+        sector:
+          type: string
+          example: "retail"
+        theme_colour:
+          type: string
+          example: "#007bff"
+        domain:
+          type: object
+          properties:
+            cname:
+              type: string
+              example: "shop.acme.com"
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "Premium Widget"
+        teaser:
+          type: string
+          example: "The best widget money can buy"
+        price:
+          type: number
+          format: float
+          example: 99.99
+        currency_id:
+          type: integer
+          example: 1
+        image:
+          type: string
+          example: "https://example.com/product.jpg"
+        permalink:
+          type: string
+          example: "/products/premium-widget"
+        public:
+          type: boolean
+          example: true
+        unlimited:
+          type: boolean
+          example: false
+        rating_sum:
+          type: integer
+          example: 450
+        rating_count:
+          type: integer
+          example: 90
+        status:
+          type: integer
+          example: 1
+        tag_ids:
+          type: array
+          items:
+            type: integer
+          example: [1, 2, 3]
+        units_remaining:
+          type: integer
+          example: 100
+        units_sold:
+          type: integer
+          example: 50
+        category_id:
+          type: integer
+          example: 1
+        data:
+          type: object
+        meta:
+          type: object
+        inserted_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        customer_id:
+          type: integer
+          example: 123
+        cart_id:
+          type: integer
+          example: 456
+        shipping_address_id:
+          type: integer
+          example: 789
+        billing_address_id:
+          type: integer
+          example: 790
+        shipping_method_id:
+          type: integer
+          example: 1
+        payment_method_id:
+          type: integer
+          example: 2
+        total:
+          type: number
+          format: float
+          example: 199.99
+        currency:
+          type: string
+          example: "USD"
+        status:
+          type: string
+          example: "pending"
+        status_on:
+          type: integer
+          example: 1
+        checkout_token:
+          type: string
+          example: "chk_abc123"
+        kind:
+          type: string
+          example: "online"
+        reference_id:
+          type: string
+          example: "ord_abc123"
+        currency_id:
+          type: integer
+          example: 1
+        inserted_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    OrderStats:
+      type: object
+      properties:
+        total_orders:
+          type: integer
+          example: 1250
+        total_revenue:
+          type: number
+          format: float
+          example: 125000.00
+        pending_orders:
+          type: integer
+          example: 15
+        completed_orders:
+          type: integer
+          example: 1200
+        cancelled_orders:
+          type: integer
+          example: 35
+        average_order_value:
+          type: number
+          format: float
+          example: 100.00
+        orders_today:
+          type: integer
+          example: 25
+        revenue_today:
+          type: number
+          format: float
+          example: 2500.00
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "My Blog Post"
+        description:
+          type: string
+          example: "This is a blog post description"
+        image:
+          type: string
+          example: "https://example.com/image.jpg"
+        kind:
+          type: integer
+          example: 1
+        uid:
+          type: string
+          example: "post_abc123"
+        path:
+          type: string
+          example: "/blog/my-blog-post"
+        status:
+          type: integer
+          example: 6
+        data:
+          type: object
+        inserted_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    File:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "document.pdf"
+        url:
+          type: string
+          example: "https://cdn.example.com/files/document.pdf"
+        content_type:
+          type: string
+          example: "application/pdf"
+        size:
+          type: integer
+          example: 1024000
+        width:
+          type: integer
+          example: 1920
+        height:
+          type: integer
+          example: 1080
+        record:
+          type: string
+          example: "posts"
+        record_id:
+          type: integer
+          example: 123
+        kind:
+          type: integer
+          example: 1
+        user_id:
+          type: integer
+          example: 1
+        data:
+          type: object
+        inserted_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # Input Schema Definitions
+
+    ProductInput:
+      type: object
+      required:
+        - title
+        - price
+        - currency_id
+      properties:
+        title:
+          type: string
+          example: "Premium Widget"
+        teaser:
+          type: string
+          example: "The best widget money can buy"
+        description:
+          type: string
+          example: "A detailed description of the premium widget"
+        price:
+          type: number
+          format: float
+          example: 99.99
+        currency_id:
+          type: integer
+          example: 1
+        image:
+          type: string
+          example: "https://example.com/product.jpg"
+        permalink:
+          type: string
+          example: "/products/premium-widget"
+        public:
+          type: boolean
+          example: true
+        unlimited:
+          type: boolean
+          example: false
+        status:
+          type: integer
+          example: 1
+        tag_ids:
+          type: array
+          items:
+            type: integer
+          example: [1, 2, 3]
+        units_remaining:
+          type: integer
+          example: 100
+        category_id:
+          type: integer
+          example: 1
+        data:
+          type: object
+        meta:
+          type: object
+
+    ProductVariantInput:
+      type: object
+      required:
+        - product_id
+        - title
+        - price
+      properties:
+        product_id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "Large Red Widget"
+        price:
+          type: number
+          format: float
+          example: 109.99
+        sku:
+          type: string
+          example: "WDG-L-RED"
+        status:
+          type: integer
+          example: 1
+        unlimited:
+          type: boolean
+          example: false
+        units_remaining:
+          type: integer
+          example: 50
+        data:
+          type: object
+
+    VariantGroupInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: "Size"
+        description:
+          type: string
+          example: "Product size variations"
+        status:
+          type: integer
+          example: 1
+        data:
+          type: object
+
+    ProductTagInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: "featured"
+        description:
+          type: string
+          example: "Featured products"
+        color:
+          type: string
+          example: "#ff0000"
+        status:
+          type: integer
+          example: 1
+
+    CategoryInput:
+      type: object
+      required:
+        - kind
+        - name
+      properties:
+        name:
+          type: string
+          example: "Electronics"
+          maxLength: 128
+        description:
+          type: string
+          example: "Electronic products and gadgets"
+        kind:
+          type: integer
+          example: 1
+        kind_id:
+          type: integer
+          example: 1
+        parent_id:
+          type: integer
+          example: 2
+
+    CartInput:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          example: 123
+        session_id:
+          type: string
+          example: "sess_abc123"
+        data:
+          type: string
+          $ref: '#/components/schemas/CartDataInput'
+
+    CartDataInput:
+      type: object
+      required:
+        - items
+        - total
+      properties:
+        total:
+          type: number
+          format: float
+          example: 789.99
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartLineInput'
+        quantity:
+          type: integer
+          example: 2
+
+    CartLineInput:
+      type: object
+      required:
+        - product_id
+        - variant_id
+        - quantity
+        - unit_price
+      properties:
+        product_id:
+          type: integer
+          example: 789
+        variant_id:
+          type: integer
+          example: 789
+        quantity:
+          type: integer
+          example: 2
+        unit_price:
+          type: number
+          format: float
+          example: 49.99
+          
+    ShippingMethodInput:
+      type: object
+      required:
+        - name
+        - price
+      properties:
+        name:
+          type: string
+          example: "Standard Shipping"
+        description:
+          type: string
+          example: "Delivery within 3-5 business days"
+        price:
+          type: number
+          format: float
+          example: 9.99
+        estimated_days:
+          type: integer
+          example: 5
+        status:
+          type: integer
+          example: 1
+        data:
+          type: object
+
+    ShippingAreaInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: "North America"
+        description:
+          type: string
+          example: "Shipping area covering US and Canada"
+        countries:
+          type: array
+          items:
+            type: string
+          example: ["US", "CA"]
+        status:
+          type: integer
+          example: 1
+
+    PaymentMethodInput:
+      type: object
+      required:
+        - name
+        - provider
+      properties:
+        name:
+          type: string
+          example: "Credit Card"
+        provider:
+          type: string
+          example: "stripe"
+        enabled:
+          type: boolean
+          example: true
+        config:
+          type: object
+        data:
+          type: object
+
+    SubscriptionInput:
+      type: object
+      required:
+        - plan_id
+        - user_id
+      properties:
+        plan_id:
+          type: integer
+          example: 1
+        user_id:
+          type: integer
+          example: 123
+        status:
+          type: string
+          enum: [active, cancelled, expired, pending]
+          example: "active"
+        trial_ends_at:
+          type: string
+          format: date-time
+          example: "2024-02-01T00:00:00Z"
+        ends_at:
+          type: string
+          format: date-time
+          example: "2024-12-31T23:59:59Z"
+        data:
+          type: object
+
+    PlanInput:
+      type: object
+      required:
+        - name
+        - price
+        - currency
+        - interval
+      properties:
+        name:
+          type: string
+          example: "Premium Plan"
+        description:
+          type: string
+          example: "Full access to all features"
+        price:
+          type: number
+          format: float
+          example: 29.99
+        currency:
+          type: string
+          example: "USD"
+        interval:
+          type: string
+          enum: [month, year, week, day]
+          example: "month"
+        interval_count:
+          type: integer
+          default: 1
+          example: 1
+        trial_period_days:
+          type: integer
+          example: 14
+        active:
+          type: boolean
+          example: true
+        features:
+          type: array
+          items:
+            type: string
+          example: ["feature1", "feature2"]
+        data:
+          type: object
+
+    GenericInput:
+      type: object
+      required:
+        - key
+        - kind
+      properties:
+        key:
+          type: string
+          example: "example_key"
+        kind:
+          type: integer
+          example: 1
+        data:
+          type: object
+
+    FileInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: "document.pdf"
+        description:
+          type: string
+          example: "Important document"
+        record:
+          type: string
+          example: "posts"
+        record_id:
+          type: integer
+          example: 123
+        kind:
+          type: integer
+          example: 1
+        public:
+          type: boolean
+          example: true
+        data:
+          type: object
+
+    BookingInput:
+      type: object
+      required:
+        - customer_id
+        - service_id
+        - appointment_time
+      properties:
+        customer_id:
+          type: integer
+          example: 123
+        service_id:
+          type: integer
+          example: 456
+        appointment_time:
+          type: string
+          format: date-time
+          example: "2024-02-01T14:00:00Z"
+        duration_minutes:
+          type: integer
+          example: 60
+        notes:
+          type: string
+          example: "First time appointment"
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled, completed]
+          example: "pending"
+        data:
+          type: object
+
+    OrganisationInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: "Acme Organization"
+        description:
+          type: string
+          example: "A sample organization"
+        website:
+          type: string
+          example: "https://acme.org"
+        email:
+          type: string
+          format: email
+          example: "contact@acme.org"
+        phone:
+          type: string
+          example: "+1234567890"
+        address:
+          type: string
+          example: "123 Main St, City, State"
+        status:
+          type: integer
+          example: 1
+        data:
+          type: object
+
+    ReviewInput:
+      type: object
+      required:
+        - product_id
+        - rating
+        - comment
+      properties:
+        product_id:
+          type: integer
+          example: 123
+        order_id:
+          type: integer
+          example: 456
+        user_id:
+          type: integer
+          example: 789
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 4
+        comment:
+          type: string
+          example: "Great product, very satisfied!"
+        title:
+          type: string
+          example: "Excellent quality"
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+          example: "approved"
+        data:
+          type: object
+
+    NotificationInput:
+      type: object
+      required:
+        - user_id
+        - title
+        - message
+      properties:
+        user_id:
+          type: integer
+          example: 123
+        title:
+          type: string
+          example: "Order Update"
+        message:
+          type: string
+          example: "Your order has been shipped"
+        type:
+          type: string
+          example: "order_update"
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+          example: "normal"
+        read:
+          type: boolean
+          default: false
+        data:
+          type: object
+
+    CurrencyInput:
+      type: object
+      required:
+        - code
+        - name
+      properties:
+        code:
+          type: string
+          example: "USD"
+        name:
+          type: string
+          example: "US Dollar"
+        symbol:
+          type: string
+          example: "$"
+        decimal_places:
+          type: integer
+          example: 2
+        active:
+          type: boolean
+          example: true
+
+    ExchangeRateInput:
+      type: object
+      required:
+        - from_currency
+        - to_currency
+        - rate
+      properties:
+        from_currency:
+          type: string
+          example: "USD"
+        to_currency:
+          type: string
+          example: "EUR"
+        rate:
+          type: number
+          format: float
+          example: 0.85
+        date:
+          type: string
+          format: date
+          example: "2024-01-01"
+
+    TransactionInput:
+      type: object
+      required:
+        - amount
+        - currency
+        - type
+      properties:
+        amount:
+          type: number
+          format: float
+          example: 100.00
+        currency:
+          type: string
+          example: "USD"
+        type:
+          type: string
+          enum: [debit, credit]
+          example: "debit"
+        description:
+          type: string
+          example: "Purchase payment"
+        reference_id:
+          type: string
+          example: "txn_abc123"
+        metadata:
+          type: object
+
+    KYCRequestInput:
+      type: object
+      required:
+        - user_id
+        - document_type
+      properties:
+        user_id:
+          type: integer
+          example: 123
+        document_type:
+          type: string
+          enum: [passport, drivers_license, national_id, utility_bill]
+          example: "passport"
+        document_number:
+          type: string
+          example: "AB123456"
+        first_name:
+          type: string
+          example: "John"
+        last_name:
+          type: string
+          example: "Doe"
+        date_of_birth:
+          type: string
+          format: date
+          example: "1990-01-01"
+        address:
+          type: string
+          example: "123 Main St, City, State"
+        phone:
+          type: string
+          example: "+1234567890"
+        status:
+          type: string
+          enum: [pending, approved, rejected, under_review]
+          example: "pending"
+        notes:
+          type: string
+          example: "Initial KYC submission"
+        data:
+          type: object
+
+    RoleInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: "admin"
+        description:
+          type: string
+          example: "Administrator role"
+        permissions:
+          type: array
+          items:
+            type: integer
+          example: [1, 2, 3]
+        active:
+          type: boolean
+          example: true
+        data:
+          type: object
+
+    PermissionInput:
+      type: object
+      required:
+        - name
+        - resource
+        - action
+      properties:
+        name:
+          type: string
+          example: "users.create"
+        description:
+          type: string
+          example: "Permission to create users"
+        resource:
+          type: string
+          example: "users"
+        action:
+          type: string
+          example: "create"
+        active:
+          type: boolean
+          example: true
+        data:
+          type: object
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: Users
+    description: User account management
+  - name: Merchants
+    description: Merchant account management
+  - name: Orders
+    description: Order processing and management
+  - name: Payments
+    description: Payment processing and transactions
+  - name: Billing
+    description: Subscription billing management
+  - name: Products
+    description: Product catalog management
+  - name: Inventory
+    description: Inventory and product management
+  - name: Checkout
+    description: Shopping cart and checkout process
+  - name: Delivery
+    description: Shipping and delivery management
+  - name: Assets
+    description: File and media management
+  - name: Appointments
+    description: Booking and appointment system
+  - name: Organizations
+    description: Organization management
+  - name: Feedback
+    description: Reviews and feedback system
+  - name: Notifications
+    description: Notification system
+  - name: Financial
+    description: Financial operations and transactions
+  - name: KYC
+    description: Know Your Customer verification
+  - name: Auth
+    description: Authorization and permissions
+  - name: Content
+    description: Content and post management
+  - name: Posts
+    description: Blog posts and content
+  - name: Files
+    description: File upload and management
+  - name: Configuration
+    description: System configuration
+  - name: Locations
+    description: Location-based services
+  - name: Generics
+    description: Generic resource operations
+  - name: Webhooks
+    description: Webhook endpoints for external services
+  - name: Exchange
+    description: Currency exchange services
+  - name: Public
+    description: Public endpoints that don't require authentication
