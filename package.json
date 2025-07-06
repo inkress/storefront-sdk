@@ -1,6 +1,6 @@
 {
   "name": "@inkress/storefront-sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Official Inkress Storefront SDK for JavaScript/TypeScript - Browser & Node.js",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
