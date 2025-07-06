@@ -20,6 +20,7 @@
     "dist",
     "README.md",
     "CHANGELOG.md",
+    "CONTRIBUTING.md",
     "LICENSE"
   ],
   "scripts": {
@@ -47,8 +48,20 @@
     "products",
     "checkout"
   ],
-  "author": "Inkress",
+  "author": {
+    "name": "Inkress",
+    "email": "dev@inkress.com",
+    "url": "https://inkress.com"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/inkress/storefront-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/inkress/storefront-sdk/issues"
+  },
+  "homepage": "https://github.com/inkress/storefront-sdk#readme",
   "dependencies": {
     "cross-fetch": "^4.0.0",
     "tslib": "^2.8.1"
@@ -60,12 +73,22 @@
     "@rollup/plugin-typescript": "^11.1.5",
     "@types/jest": "^29.5.8",
     "@types/node": "^20.9.0",
-    "@typescript-eslint/eslint-plugin": "^6.12.0",
-    "@typescript-eslint/parser": "^6.12.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
     "eslint": "^8.54.0",
     "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "jest-fetch-mock": "^3.0.3",
     "rollup": "^4.6.1",
     "ts-jest": "^29.1.1",
     "typescript": "^5.2.2"
+  },
+  "peerDependencies": {
+    "typescript": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
   }
 }

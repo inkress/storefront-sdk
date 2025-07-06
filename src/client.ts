@@ -107,6 +107,7 @@ export class HttpClient {
     const headers = this.getHeaders(requestHeaders);
     const requestTimeout = timeout || this.config.timeout;
 
+    // eslint-disable-next-line no-undef
     const requestInit: RequestInit = {
       method,
       headers,
@@ -230,7 +231,7 @@ export class HttpClient {
   }
 
   getConfig(): Omit<StorefrontConfig, 'authToken'> {
-    const { authToken, ...config } = this.config;
+    const { authToken: _authToken, ...config } = this.config;
     return config;
   }
 }

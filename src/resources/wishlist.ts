@@ -5,7 +5,6 @@ import type {
   Wishlist,
   WishlistItem,
   Product,
-  ApiResponse,
   Generic,
   GenericInput,
 } from '../types';

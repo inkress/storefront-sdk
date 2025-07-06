@@ -111,7 +111,7 @@ export class CategoriesResource {
    */
   async getRoots(params?: CategoryListParams): Promise<ApiResponse<PaginatedResponse<Category>>> {
     // Filter out parent_id to get only root categories
-    const { parent_id, ...restParams } = params || {};
+    const { parent_id: _parent_id, ...restParams } = params || {};
     return this.list(restParams);
   }
 
