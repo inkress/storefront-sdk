@@ -1,3 +1,6 @@
+// Re-export payment helper types so consumers can import them from the root.
+export type { PaymentURLOptions, PaymentCustomer } from './utils/payment';
+
 // Common interfaces
 export interface PaginationParams {
   page?: number;
@@ -317,11 +320,12 @@ export interface StorefrontEvents {
   'cart:item:removed': { itemId: string; cart: Cart };
   'cart:item:updated': { item: CartItem; cart: Cart };
   'cart:cleared': { cart: Cart };
+  'checkout:started': { cart: Cart };
   'wishlist:item:added': { item: WishlistItem; wishlist: Wishlist };
   'wishlist:item:removed': { itemId: string; wishlist: Wishlist };
   'wishlist:cleared': { wishlist: Wishlist };
   'customer:authenticated': { customer: Customer; token: string };
-  'customer:logout': {};
+  'customer:logout': Record<string, never>;
 }
 
 // Search and filter types

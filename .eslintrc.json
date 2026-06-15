@@ -1,23 +1,23 @@
 {
   "root": true,
   "parser": "@typescript-eslint/parser",
-  "extends": [
-    "eslint:recommended"
-  ],
+  "plugins": ["@typescript-eslint"],
+  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
   "parserOptions": {
     "ecmaVersion": 2020,
     "sourceType": "module"
   },
   "rules": {
-    "no-unused-vars": ["error", { 
-      "args": "none",
-      "varsIgnorePattern": "^_"
-    }]
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-unused-vars": ["error", { "args": "none", "varsIgnorePattern": "^_", "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "no-undef": "off"
   },
   "env": {
     "node": true,
     "es6": true,
     "browser": true
   },
-  "ignorePatterns": ["dist/", "node_modules/"]
+  "ignorePatterns": ["dist/", "node_modules/", "examples/", "*.config.js", "*.config.cjs"]
 }

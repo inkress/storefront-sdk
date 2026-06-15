@@ -1,48 +1,45 @@
-# Source files
+# Source & tests
 src/
-tests/
-*.test.ts
-*.test.js
+**/*.test.ts
+**/__tests__/
 
-# Development files
+# Docs & examples (not shipped beyond the allow-listed README/CHANGELOG/CONTRIBUTING/LICENSE)
+docs/
+examples/
+
+# Tooling
 .git/
 .github/
-node_modules/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Build tools
-rollup.config.js
-tsconfig.json
-jest.config.js
-.eslintrc.*
-
-# Development artifacts
-.nyc_output/
-coverage/
-.DS_Store
-Thumbs.db
-
-# IDE files
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
+node_modules/
+rollup.config.js
+tsconfig*.json
+jest.config.cjs
+jest.setup.cjs
+.eslintrc*
+.prettierrc
+coverage/
+.nyc_output/
 
-# Temporary files
-tmp/
-temp/
-
-# Package manager files
+# Lockfiles & env
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+.yarn/
+.env*
+*.tgz
+*.log
 
-# Environment files
-.env
-.env.local
-.env.test
-.env.production
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Legacy stub artifacts
+.pnp.cjs
+storefront-sdk.js
+storefront-sdk-0.0.1.js
+index.tsx
+cart.ts
