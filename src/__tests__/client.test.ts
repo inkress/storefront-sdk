@@ -1,7 +1,7 @@
 import { HttpClient } from '../client';
 
 const fetchMock = fetch as unknown as jest.Mock & {
-  mockResponseOnce: (body: string, init?: any) => void;
+  mockResponseOnce: (body: string | (() => Promise<any>), init?: any) => void;
   resetMocks: () => void;
 };
 
@@ -100,5 +100,17 @@ describe('HttpClient', () => {
     client.updateConfig({ mode: 'live' }); // same mode — must NOT discard the override
     await client.get('/ping');
     expect(lastCall()[0]).toBe('https://self.example.com/api/v1/ping');
+  });
+
+  it('rejects with InkressApiError(status 0) when the request times out', async () => {
+    // Respond slower than the 5ms timeout so the timer wins the race.
+    fetchMock.mockResponseOnce(
+      () => new Promise((resolve) => setTimeout(() => resolve(JSON.stringify({ state: 'ok' })), 80))
+    );
+    const client = new HttpClient({ timeout: 5 });
+    await expect(client.get('/slow')).rejects.toMatchObject({
+      name: 'InkressApiError',
+      status: 0,
+    });
   });
 });
