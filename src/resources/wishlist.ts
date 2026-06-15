@@ -32,9 +32,10 @@ export class WishlistResource {
   }
 
   /**
-   * Set user ID for remote storage
+   * Set (or clear, when called with no argument) the user ID used for remote
+   * wishlist sync.
    */
-  setUserId(userId: number): void {
+  setUserId(userId?: number): void {
     this.userId = userId;
   }
 
