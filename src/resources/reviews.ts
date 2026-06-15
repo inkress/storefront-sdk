@@ -7,25 +7,48 @@ import type {
   ReviewListParams,
   ReviewStats,
 } from '../types';
+import { processQuery } from '../utils/query-transformer';
+import { ReviewQueryBuilder, type Queryable } from '../utils/query-builders';
+import {
+  REVIEW_FIELD_TYPES,
+  QUERY_CONTEXT,
+  type ReviewQueryParams,
+  type ReviewListResponse,
+} from '../types/resources';
 
 /**
  * Reviews resource for managing product reviews and ratings
- * 
+ *
  * Reviews allow customers to rate and comment on products they've purchased.
  * This resource provides functionality for submitting, retrieving, and managing
  * product reviews with support for filtering, moderation, and statistics.
  */
-export class ReviewsResource {
+export class ReviewsResource implements Queryable<ReviewListResponse> {
   constructor(private client: HttpClient) {}
 
   /**
    * List reviews with optional filtering and pagination
-   * 
+   *
    * @param params - Query parameters for filtering and pagination
    * @returns Promise resolving to paginated list of reviews
    */
   async list(params?: ReviewListParams): Promise<ApiResponse<PaginatedResponse<Review>>> {
     return this.client.get<PaginatedResponse<Review>>('/reviews', params);
+  }
+
+  /**
+   * Run a typed review query (rating range/date filters + pagination).
+   *
+   * @example await reviews.query({ parent_id: 123, rating: { min: 4 }, page: 1 })
+   */
+  async query(params?: ReviewQueryParams): Promise<ApiResponse<ReviewListResponse>> {
+    const processed = processQuery(params || {}, REVIEW_FIELD_TYPES, { context: QUERY_CONTEXT.review });
+    return this.client.get<ReviewListResponse>('/reviews', processed);
+  }
+
+  /** Start a fluent review query, e.g. `reviews.createQueryBuilder().whereProduct(123).whereMinRating(4)`. */
+  createQueryBuilder(initialQuery?: ReviewQueryParams): ReviewQueryBuilder {
+    return new ReviewQueryBuilder(this, initialQuery);
   }
 
   /**
@@ -141,8 +164,7 @@ export class ReviewsResource {
    * @returns Promise resolving to paginated list of matching reviews
    */
   async search(query: string, params?: ReviewListParams): Promise<ApiResponse<PaginatedResponse<Review>>> {
-    // Note: Search functionality would depend on API support
-    return this.list({ ...params });
+    return this.list({ ...params, q: query } as ReviewListParams);
   }
 
   // Review moderation and management methods

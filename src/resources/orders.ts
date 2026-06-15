@@ -6,6 +6,14 @@ import type {
   PaginationParams,
   PaginatedResponse,
 } from '../types';
+import { processQuery } from '../utils/query-transformer';
+import { OrderQueryBuilder, type Queryable } from '../utils/query-builders';
+import {
+  ORDER_FIELD_TYPES,
+  QUERY_CONTEXT,
+  type OrderQueryParams,
+  type OrderListResponse,
+} from '../types/resources';
 
 export interface OrderListParams extends PaginationParams {
   status?: string;
@@ -15,9 +23,10 @@ export interface OrderListParams extends PaginationParams {
 }
 
 /**
- * Orders resource for managing customer orders
+ * Orders resource for managing customer orders (requires an auth token for
+ * customer-scoped reads).
  */
-export class OrdersResource {
+export class OrdersResource implements Queryable<OrderListResponse> {
   constructor(private client: HttpClient) {}
 
   /**
@@ -25,6 +34,22 @@ export class OrdersResource {
    */
   async list(params?: OrderListParams): Promise<ApiResponse<PaginatedResponse<Order>>> {
     return this.client.get<PaginatedResponse<Order>>('/orders', params);
+  }
+
+  /**
+   * Run a typed order query (range/contains/date filters; `kind` is translated
+   * to API codes, `status` passes through as a string).
+   *
+   * @example await orders.query({ status: 'completed', total: { min: 100 }, page: 1 })
+   */
+  async query(params?: OrderQueryParams): Promise<ApiResponse<OrderListResponse>> {
+    const processed = processQuery(params || {}, ORDER_FIELD_TYPES, { context: QUERY_CONTEXT.order });
+    return this.client.get<OrderListResponse>('/orders', processed);
+  }
+
+  /** Start a fluent order query. */
+  createQueryBuilder(initialQuery?: OrderQueryParams): OrderQueryBuilder {
+    return new OrderQueryBuilder(this, initialQuery);
   }
 
   /**
@@ -53,12 +78,12 @@ export class OrdersResource {
    */
   async getByReference(referenceId: string): Promise<ApiResponse<Order>> {
     const response = await this.list({ reference_id: referenceId, page_size: 1 });
-    
-    if (response.state === 'ok' && response.result && (response.result as any).entries.length > 0) {
+
+    if (response.state === 'ok' && response.result && response.result.entries.length > 0) {
       // Return the first order in the same format as get()
       return {
         state: response.state,
-        result: (response.result as any).entries[0]
+        result: response.result.entries[0]
       };
     } else {
       // Return not found response

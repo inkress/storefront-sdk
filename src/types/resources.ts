@@ -84,3 +84,51 @@ export interface ReviewQueryParams extends BaseListParams {
   created_at?: DateFilter;
   [key: string]: unknown;
 }
+
+// ---------------------------------------------------------------------------
+// Field-type maps. Passed to processQuery with a context so contextual string
+// values for numeric `status`/`kind` fields are translated to the API's codes.
+// Order `status` is intentionally omitted — storefront orders carry string
+// statuses, so they pass through untranslated.
+// ---------------------------------------------------------------------------
+type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'array';
+
+export const PRODUCT_FIELD_TYPES: Record<string, FieldType> = {
+  status: 'number',
+  price: 'number',
+  public: 'boolean',
+  unlimited: 'boolean',
+  category_id: 'number',
+  units_remaining: 'number',
+  title: 'string',
+  created_at: 'date',
+};
+
+export const ORDER_FIELD_TYPES: Record<string, FieldType> = {
+  kind: 'number',
+  total: 'number',
+  customer_id: 'number',
+  reference_id: 'string',
+  created_at: 'date',
+};
+
+export const CATEGORY_FIELD_TYPES: Record<string, FieldType> = {
+  kind: 'number',
+  parent_id: 'number',
+  name: 'string',
+};
+
+export const REVIEW_FIELD_TYPES: Record<string, FieldType> = {
+  parent_id: 'number',
+  customer_id: 'number',
+  rating: 'number',
+  created_at: 'date',
+};
+
+/** Context strings used for contextual status/kind translation. */
+export const QUERY_CONTEXT = {
+  product: 'product',
+  order: 'order',
+  category: 'category',
+  review: 'review',
+} as const;

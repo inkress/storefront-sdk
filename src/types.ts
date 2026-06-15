@@ -176,7 +176,7 @@ export interface Order {
   id: number;
   reference_id: string;
   total: number;
-  kind: number; // 1=offline, 2=online, 3=subscription
+  kind: number; // 1=online, 2=cart, 3=subscription, 4=invoice, 5=offline
   status: string;
   status_on: number;
   uid: string; // Unique identifier for the order
