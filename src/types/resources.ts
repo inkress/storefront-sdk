@@ -10,10 +10,11 @@ import type { PaginatedResponse, Product, Category, Order, Review } from '../typ
 // Contextual value unions (the API also accepts the raw numeric codes)
 // ---------------------------------------------------------------------------
 export type ProductStatus = 'draft' | 'published' | 'archived';
+// Storefront orders carry string statuses (Order.status is a string). The API
+// also accepts raw numeric codes, so OrderQueryParams.status permits both.
 export type OrderStatus =
   | 'pending'
   | 'confirmed'
-  | 'processing'
   | 'completed'
   | 'cancelled'
   | 'refunded';

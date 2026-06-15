@@ -48,8 +48,13 @@ describe('processQuery transform', () => {
     });
   });
 
+  it('expands gte/lte/gt/lt comparison operators', () => {
+    expect(processQuery({ price: { gte: 10, lte: 100 } })).toEqual({ price_gte: 10, price_lte: 100 });
+    expect(processQuery({ units_remaining: { gt: 0 } })).toEqual({ units_remaining_gt: 0 });
+  });
+
   it('drops null/undefined values', () => {
-    expect(processQuery({ a: null, b: undefined, c: 5 })).toEqual({ c: 5 });
+    expect(processQuery({ parent_id: null, title: undefined, id: 5 })).toEqual({ id: 5 });
   });
 });
 
@@ -84,14 +89,10 @@ describe('query builders', () => {
     expect(calls[0]).toEqual({ category_id: [1, 2] });
   });
 
-  it('CategoryQueryBuilder.whereRootOnly filters parent_id = null', () => {
+  it('CategoryQueryBuilder.whereParent filters by parent id', () => {
     const { resource } = makeResource();
-    const built = new CategoryQueryBuilder(resource as any).whereRootOnly().build();
-    // null is dropped by the transform — root filter relies on the API default.
-    expect(built.parent_id).toBeUndefined();
-    expect(new CategoryQueryBuilder(resource as any).whereRootOnly().getRawQuery()).toEqual({
-      parent_id: null,
-    });
+    const built = new CategoryQueryBuilder(resource as any).whereParent(7).whereNameContains('apparel').build();
+    expect(built).toMatchObject({ parent_id: 7, 'contains.name': 'apparel' });
   });
 
   it('OrderQueryBuilder builds status_in + total range + date range', () => {

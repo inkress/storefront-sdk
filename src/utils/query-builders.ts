@@ -23,7 +23,12 @@ import type {
   CategoryKind,
 } from '../types/resources';
 
-/** A resource that can run a transformed query and return a paginated list. */
+/**
+ * A resource that can run a query and return a paginated list. Implementors
+ * (the API resources, wired in PR3) are responsible for running `processQuery`
+ * — with their field-type map + context so status/kind strings get translated —
+ * before hitting the API. Builders pass their raw query to `query()`.
+ */
 export interface Queryable<TResponse> {
   query(params?: any): Promise<ApiResponse<TResponse>>;
 }
@@ -110,13 +115,9 @@ export class CategoryQueryBuilder extends QueryBuilder<Category> {
     return this.whereContains('name', value);
   }
 
-  whereParent(parentId: number | number[] | null): this {
-    if (parentId === null) return this.where('parent_id', null);
+  /** Filter to the children of a given parent category. */
+  whereParent(parentId: number | number[]): this {
     return Array.isArray(parentId) ? this.whereIn('parent_id', parentId) : this.where('parent_id', parentId);
-  }
-
-  whereRootOnly(): this {
-    return this.where('parent_id', null);
   }
 }
 

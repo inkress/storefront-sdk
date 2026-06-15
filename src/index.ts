@@ -19,8 +19,8 @@ import { FilesResource } from './resources/files';
 // Re-export types for convenience
 export * from './types';
 export { InkressApiError } from './client';
-// ApiResponse/StorefrontConfig/ErrorResponse come through `export * from './types'`.
-export type { HttpClient, RequestOptions, SdkMode } from './client';
+// ApiResponse/StorefrontConfig/ErrorResponse/SdkMode come through `export * from './types'`.
+export type { HttpClient, RequestOptions } from './client';
 
 // Re-export payment helpers so consumers can build hosted-checkout URLs directly.
 export {
@@ -43,9 +43,6 @@ export * from './types/resources';
 export {
   processQuery,
   QueryBuilder,
-  transformQuery,
-  flattenTransformedQuery,
-  validateQueryParams,
   type QueryParams,
   type RangeQuery,
   type StringQuery,
