@@ -8,6 +8,29 @@ import type {
   ApiResponse,
   PaginatedResponse,
 } from '../types';
+import type {
+  CreateCheckoutSessionInput,
+  CreateCheckoutSessionResponseData,
+  CheckoutCustomer,
+} from '../types/checkout';
+
+/**
+ * The slice of the checkout resource the cart needs to start a session.
+ * Declared structurally to avoid a cart <-> checkout import cycle.
+ */
+export interface CheckoutInitiator {
+  createSession(input: CreateCheckoutSessionInput): Promise<ApiResponse<CreateCheckoutSessionResponseData>>;
+}
+
+/** Options for turning the local cart into a checkout session. */
+export interface CartCheckoutOptions {
+  customer?: CheckoutCustomer;
+  /** Defaults to the currency of the first cart item. */
+  currency_code?: string;
+  title?: string;
+  reference_id?: string;
+  data?: CreateCheckoutSessionInput['data'];
+}
 
 // Remote cart types for API
 export interface RemoteCart {
@@ -69,10 +92,71 @@ export class CartResource {
   private eventEmitter: EventEmitter;
   private client: HttpClient;
 
+  private checkoutResource?: CheckoutInitiator;
+
   constructor(storage: BrowserStorage<Cart>, eventEmitter: EventEmitter, client: HttpClient) {
     this.storage = storage;
     this.eventEmitter = eventEmitter;
     this.client = client;
+  }
+
+  /** Wire the checkout resource so {@link checkout} can open a session. */
+  setCheckout(checkout: CheckoutInitiator): void {
+    this.checkoutResource = checkout;
+  }
+
+  /**
+   * Build the checkout-session input from the current cart line items.
+   * Useful if you want to inspect/augment the payload before paying.
+   *
+   * `currency_code` defaults to the first item's product currency, falling back
+   * to 'JMD' when absent. If the cart mixes currencies you MUST pass
+   * `currency_code` explicitly — the subtotal is a plain numeric sum and is only
+   * meaningful within a single currency.
+   */
+  buildCheckoutInput(options: CartCheckoutOptions = {}): CreateCheckoutSessionInput {
+    const cart = this.get();
+    if (!options.currency_code) {
+      const currencies = new Set(
+        cart.items.map((i) => i.product.currency?.code).filter(Boolean)
+      );
+      if (currencies.size > 1) {
+        throw new Error(
+          'Cart contains items in multiple currencies; pass currency_code explicitly to checkout().'
+        );
+      }
+    }
+    const currency_code =
+      options.currency_code || cart.items[0]?.product.currency?.code || 'JMD';
+    return {
+      kind: 'online',
+      currency_code,
+      total: cart.subtotal,
+      title: options.title,
+      reference_id: options.reference_id,
+      customer: options.customer,
+      data: options.data,
+      products: cart.items.map((item) => ({ id: item.product.id, quantity: item.quantity })),
+    };
+  }
+
+  /**
+   * Start checkout for the current cart: builds the order payload from the line
+   * items and opens a checkout session (returns the hosted-frame fields).
+   * Emits `checkout:started`. Requires the SDK-wired checkout resource.
+   */
+  async checkout(options: CartCheckoutOptions = {}): Promise<ApiResponse<CreateCheckoutSessionResponseData>> {
+    if (!this.checkoutResource) {
+      throw new Error(
+        'Checkout is not available on this cart. Use the cart from an InkressStorefrontSDK instance, or call setCheckout().'
+      );
+    }
+    const cart = this.get();
+    if (cart.items.length === 0) {
+      throw new Error('Cannot check out an empty cart.');
+    }
+    this.eventEmitter.emit('checkout:started', { cart });
+    return this.checkoutResource.createSession(this.buildCheckoutInput(options));
   }
 
   /**

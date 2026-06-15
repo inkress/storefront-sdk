@@ -5,6 +5,49 @@ All notable changes to the Inkress Storefront SDK will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-06-15
+
+A major capability release that brings the storefront SDK to architectural parity
+with `@inkress/admin-sdk`. Fully backward compatible.
+
+### Added
+- **`mode: 'live' | 'sandbox'`** config that resolves both the API endpoint and
+  the hosted-checkout site origin (with `endpoint`/`siteUrl` overrides).
+- **Typed query system** shared with `@inkress/admin-sdk`: `processQuery`, the
+  `QueryBuilder` base, and `ProductQueryBuilder`/`CategoryQueryBuilder`/
+  `OrderQueryBuilder`/`ReviewQueryBuilder`. Each list resource gains `query()`
+  and `createQueryBuilder()`, with contextual `status`/`kind` translation.
+- **Checkout money path** — a `checkout` resource: `createPaymentUrl()`,
+  `createSession()`, `getSession()`, `cancelSession()`, and an SSR-safe
+  `redirectToCheckout()`. Plus `cart.checkout()` which builds the order payload
+  from local line items.
+- **In-memory storage fallback** so the cart/wishlist work in Node/SSR (scoped
+  per SDK instance — no cross-request bleed), and a robust fallback when a
+  `localStorage` write throws (Safari private mode / quota).
+- **`checkout:started`** event.
+- Comprehensive README, examples, and an extensive jest test suite.
+
+### Changed
+- `HttpClient` now resolves endpoints from `mode` (was a hardcoded endpoint),
+  handles `FormData` bodies, clears its request-timeout timer, and preserves a
+  custom `endpoint` across same-mode `updateConfig` calls.
+- `updateConfig({ merchantUsername })` re-points the storage namespace in place
+  (and clears the wishlist user id) instead of recreating cart/wishlist.
+
+### Backward compatibility / migration from 0.0.1
+- The legacy **`Inkress`** class is still exported. Existing
+  `new Inkress({ mode }).createPaymentUrl({ username, total, ... })` code keeps
+  working unchanged.
+- New code should prefer:
+  ```diff
+  - import Inkress from '@inkress/storefront-sdk';
+  - const url = new Inkress({ mode: 'live' }).createPaymentUrl({ username: 'acme', total: 25 });
+  + import { InkressStorefrontSDK } from '@inkress/storefront-sdk';
+  + const sdk = InkressStorefrontSDK.forMerchant('acme');
+  + const url = sdk.checkout.createPaymentUrl({ total: 25 });
+  ```
+  Note: the legacy `mode: 'test'` becomes `mode: 'sandbox'` on `InkressStorefrontSDK`.
+
 ## [1.0.0] - 2025-07-06
 
 ### Added

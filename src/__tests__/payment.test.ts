@@ -42,7 +42,10 @@ describe('payment utils', () => {
     expect(() => validatePaymentOptions({ username: '', total: 10 })).toThrow('username is required');
     expect(() =>
       validatePaymentOptions({ username: 'acme', total: NaN })
-    ).toThrow('Valid total amount is required');
+    ).toThrow('positive total amount is required');
+    expect(() =>
+      validatePaymentOptions({ username: 'acme', total: 0 })
+    ).toThrow('positive total amount is required');
   });
 
   it('generates non-empty random ids', () => {

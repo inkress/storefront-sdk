@@ -76,8 +76,8 @@ export function validatePaymentOptions(options: PaymentURLOptions): void {
     throw new Error('Merchant username is required');
   }
   const { total } = options;
-  if (total === undefined || total === null || isNaN(Number(total))) {
-    throw new Error('Valid total amount is required');
+  if (total === undefined || total === null || isNaN(Number(total)) || Number(total) <= 0) {
+    throw new Error('A valid positive total amount is required');
   }
 }
 
