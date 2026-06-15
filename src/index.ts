@@ -187,26 +187,12 @@ export class InkressStorefrontSDK {
    */
   updateConfig(newConfig: Partial<StorefrontConfig>): void {
     this.client.updateConfig(newConfig);
-    
-    // Update storage prefix if merchant username changed
+
+    // Re-point the per-merchant storage namespace if the merchant changed. This
+    // updates the existing storage instances in place, so the cart/wishlist
+    // resource references consumers already hold remain valid.
     if (newConfig.merchantUsername) {
-      this.storageManager = new StorageManager(`inkress-${newConfig.merchantUsername}`);
-      
-      // Reinitialize cart and wishlist with new storage
-      const cartResource = new CartResource(
-        this.storageManager.createStorage('cart'),
-        this.eventEmitter,
-        this.client
-      );
-      const wishlistResource = new WishlistResource(
-        this.storageManager.createStorage('wishlist'),
-        this.eventEmitter,
-        this.generic
-      );
-      
-      // Replace the resources (this is a bit hacky but maintains the public API)
-      Object.assign(this.cart, cartResource);
-      Object.assign(this.wishlist, wishlistResource);
+      this.storageManager.setPrefix(`inkress-${newConfig.merchantUsername}`);
     }
   }
 

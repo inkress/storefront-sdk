@@ -1,7 +1,26 @@
 /**
- * Browser storage utility for managing cart, wishlist, and other data
- * Gracefully handles server-side rendering and missing localStorage
+ * Browser storage utility for cart, wishlist, and other persisted SDK data.
+ *
+ * SSR-safe: when `localStorage` is unavailable (server, Node, locked-down
+ * browser) it transparently falls back to a process-wide in-memory store, so a
+ * cart still works within a single runtime instead of silently no-op'ing.
  */
+
+// Shared in-memory fallback, keyed by the fully-qualified storage key.
+const memoryStore = new Map<string, string>();
+
+function localStorageAvailable(): boolean {
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      typeof window.localStorage !== 'undefined' &&
+      window.localStorage !== null
+    );
+  } catch {
+    return false;
+  }
+}
+
 export class BrowserStorage<T> {
   private key: string;
   private prefix: string;
@@ -11,61 +30,55 @@ export class BrowserStorage<T> {
     this.prefix = prefix;
   }
 
+  /** Update the namespace prefix (e.g. when the active merchant changes). */
+  setPrefix(prefix: string): void {
+    this.prefix = prefix;
+  }
+
   private getStorageKey(): string {
     return `${this.prefix}:${this.key}`;
   }
 
-  private isStorageAvailable(): boolean {
-    try {
-      return typeof window !== 'undefined' && 
-             typeof window.localStorage !== 'undefined' &&
-             window.localStorage !== null;
-    } catch {
-      return false;
-    }
-  }
-
   get(): T | null {
-    if (!this.isStorageAvailable()) {
-      return null;
-    }
-
+    const storageKey = this.getStorageKey();
     try {
-      const item = localStorage.getItem(this.getStorageKey());
-      if (item === null) {
-        return null;
-      }
-      return JSON.parse(item) as T;
+      const raw = localStorageAvailable()
+        ? window.localStorage.getItem(storageKey)
+        : memoryStore.get(storageKey) ?? null;
+      return raw === null || raw === undefined ? null : (JSON.parse(raw) as T);
     } catch (error) {
-      console.warn(`Error reading from localStorage for key ${this.getStorageKey()}:`, error);
+      console.warn(`Error reading storage for key ${storageKey}:`, error);
       return null;
     }
   }
 
   set(value: T): boolean {
-    if (!this.isStorageAvailable()) {
-      return false;
-    }
-
+    const storageKey = this.getStorageKey();
     try {
-      localStorage.setItem(this.getStorageKey(), JSON.stringify(value));
+      const raw = JSON.stringify(value);
+      if (localStorageAvailable()) {
+        window.localStorage.setItem(storageKey, raw);
+      } else {
+        memoryStore.set(storageKey, raw);
+      }
       return true;
     } catch (error) {
-      console.warn(`Error writing to localStorage for key ${this.getStorageKey()}:`, error);
+      console.warn(`Error writing storage for key ${storageKey}:`, error);
       return false;
     }
   }
 
   remove(): boolean {
-    if (!this.isStorageAvailable()) {
-      return false;
-    }
-
+    const storageKey = this.getStorageKey();
     try {
-      localStorage.removeItem(this.getStorageKey());
+      if (localStorageAvailable()) {
+        window.localStorage.removeItem(storageKey);
+      } else {
+        memoryStore.delete(storageKey);
+      }
       return true;
     } catch (error) {
-      console.warn(`Error removing from localStorage for key ${this.getStorageKey()}:`, error);
+      console.warn(`Error removing storage for key ${storageKey}:`, error);
       return false;
     }
   }
@@ -76,55 +89,74 @@ export class BrowserStorage<T> {
 }
 
 /**
- * Storage manager for handling multiple storage instances
+ * Manages a family of namespaced storage instances under a shared prefix.
+ * Tracks the instances it creates so the prefix can be re-pointed (e.g. on a
+ * merchant switch) without invalidating references consumers already captured.
  */
 export class StorageManager {
   private prefix: string;
+  private created: BrowserStorage<unknown>[] = [];
 
   constructor(prefix = 'inkress') {
     this.prefix = prefix;
   }
 
   createStorage<T>(key: string): BrowserStorage<T> {
-    return new BrowserStorage<T>(key, this.prefix);
+    const storage = new BrowserStorage<T>(key, this.prefix);
+    this.created.push(storage as BrowserStorage<unknown>);
+    return storage;
+  }
+
+  /** Re-point this manager and all storages it created at a new prefix. */
+  setPrefix(prefix: string): void {
+    this.prefix = prefix;
+    this.created.forEach((s) => s.setPrefix(prefix));
+  }
+
+  private eachKey(fn: (key: string) => void): void {
+    const prefixPattern = `${this.prefix}:`;
+    let keys: string[];
+    if (localStorageAvailable()) {
+      // Enumerate via the Web Storage API (length + key(i)) rather than
+      // Object.keys, which isn't reliable across Storage implementations.
+      const ls = window.localStorage;
+      keys = [];
+      for (let i = 0; i < ls.length; i++) {
+        const k = ls.key(i);
+        if (k !== null) keys.push(k);
+      }
+    } else {
+      keys = Array.from(memoryStore.keys());
+    }
+    keys.filter((k) => k.startsWith(prefixPattern)).forEach(fn);
   }
 
   clearAll(): boolean {
-    if (typeof window === 'undefined' || !window.localStorage) {
-      return false;
-    }
-
     try {
-      const keys = Object.keys(localStorage);
-      const prefixPattern = `${this.prefix}:`;
-      
-      keys.forEach(key => {
-        if (key.startsWith(prefixPattern)) {
-          localStorage.removeItem(key);
+      const toRemove: string[] = [];
+      this.eachKey((k) => toRemove.push(k));
+      toRemove.forEach((k) => {
+        if (localStorageAvailable()) {
+          window.localStorage.removeItem(k);
+        } else {
+          memoryStore.delete(k);
         }
       });
-      
       return true;
     } catch (error) {
-      console.warn('Error clearing localStorage:', error);
+      console.warn('Error clearing storage:', error);
       return false;
     }
   }
 
   getAllKeys(): string[] {
-    if (typeof window === 'undefined' || !window.localStorage) {
-      return [];
-    }
-
+    const prefixPattern = `${this.prefix}:`;
     try {
-      const keys = Object.keys(localStorage);
-      const prefixPattern = `${this.prefix}:`;
-      
-      return keys
-        .filter(key => key.startsWith(prefixPattern))
-        .map(key => key.replace(prefixPattern, ''));
+      const keys: string[] = [];
+      this.eachKey((k) => keys.push(k.replace(prefixPattern, '')));
+      return keys;
     } catch (error) {
-      console.warn('Error getting localStorage keys:', error);
+      console.warn('Error reading storage keys:', error);
       return [];
     }
   }
