@@ -70,6 +70,7 @@ export interface Product {
   data?: Record<string, any>;
   meta?: Record<string, any>;
   currency: Currency;
+  category_id?: number | null;
   category?: Category;
   merchant: Merchant;
   created_at: string;
