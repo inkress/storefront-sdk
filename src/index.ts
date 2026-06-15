@@ -19,8 +19,8 @@ import { FilesResource } from './resources/files';
 // Re-export types for convenience
 export * from './types';
 export { InkressApiError } from './client';
-// ApiResponse/StorefrontConfig/ErrorResponse come through `export * from './types'`.
-export type { HttpClient, RequestOptions, SdkMode } from './client';
+// ApiResponse/StorefrontConfig/ErrorResponse/SdkMode come through `export * from './types'`.
+export type { HttpClient, RequestOptions } from './client';
 
 // Re-export payment helpers so consumers can build hosted-checkout URLs directly.
 export {
@@ -37,6 +37,25 @@ import {
   generateRandomId as _generateRandomId,
   type PaymentURLOptions as _PaymentURLOptions,
 } from './utils/payment';
+
+// Query system (shared mental model with @inkress/admin-sdk).
+export * from './types/resources';
+export {
+  processQuery,
+  QueryBuilder,
+  type QueryParams,
+  type RangeQuery,
+  type StringQuery,
+  type DateQuery,
+  type JsonQueryParams,
+} from './utils/query-transformer';
+export {
+  ProductQueryBuilder,
+  CategoryQueryBuilder,
+  OrderQueryBuilder,
+  ReviewQueryBuilder,
+  type Queryable,
+} from './utils/query-builders';
 
 /**
  * Main Inkress Storefront SDK class
