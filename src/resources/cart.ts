@@ -108,9 +108,24 @@ export class CartResource {
   /**
    * Build the checkout-session input from the current cart line items.
    * Useful if you want to inspect/augment the payload before paying.
+   *
+   * `currency_code` defaults to the first item's product currency, falling back
+   * to 'JMD' when absent. If the cart mixes currencies you MUST pass
+   * `currency_code` explicitly — the subtotal is a plain numeric sum and is only
+   * meaningful within a single currency.
    */
   buildCheckoutInput(options: CartCheckoutOptions = {}): CreateCheckoutSessionInput {
     const cart = this.get();
+    if (!options.currency_code) {
+      const currencies = new Set(
+        cart.items.map((i) => i.product.currency?.code).filter(Boolean)
+      );
+      if (currencies.size > 1) {
+        throw new Error(
+          'Cart contains items in multiple currencies; pass currency_code explicitly to checkout().'
+        );
+      }
+    }
     const currency_code =
       options.currency_code || cart.items[0]?.product.currency?.code || 'JMD';
     return {

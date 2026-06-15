@@ -76,6 +76,7 @@ interface StorefrontConfig {
 
 ```typescript
 const sdk = InkressStorefrontSDK.forMerchantWithAuth('acme', customerJwt);
+// or with auth only (no merchant): InkressStorefrontSDK.withAuth(customerJwt)
 // or, later:
 sdk.setAuthToken(customerJwt);
 sdk.clearAuthToken();

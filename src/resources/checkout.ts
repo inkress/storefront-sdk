@@ -4,6 +4,7 @@ import type {
   CreateCheckoutSessionInput,
   CreateCheckoutSessionResponseData,
   CheckoutSession,
+  DeleteCheckoutSessionResponseData,
 } from '../types/checkout';
 
 /**
@@ -50,8 +51,10 @@ export class CheckoutResource {
   }
 
   /** Cancel a checkout session. */
-  async cancelSession(sessionId: string): Promise<ApiResponse<string>> {
-    return this.client.delete<string>(`/checkout/sessions/${encodeURIComponent(sessionId)}`);
+  async cancelSession(sessionId: string): Promise<ApiResponse<DeleteCheckoutSessionResponseData>> {
+    return this.client.delete<DeleteCheckoutSessionResponseData>(
+      `/checkout/sessions/${encodeURIComponent(sessionId)}`
+    );
   }
 
   /**
@@ -65,6 +68,11 @@ export class CheckoutResource {
     const url = typeof target === 'string' ? target : target?.frame_url;
     if (!url) {
       throw new Error('redirectToCheckout: no URL (or frame_url) to redirect to');
+    }
+    // Guard against javascript:/data: and other non-navigational schemes — this
+    // is a public method and the URL may originate from caller-controlled input.
+    if (!/^(https?:\/\/|\/)/i.test(url)) {
+      throw new Error('redirectToCheckout: URL must be an absolute http(s) URL or a root-relative path');
     }
     if (typeof window === 'undefined' || !window.location) {
       console.warn('redirectToCheckout called in a non-browser environment; skipping redirect.');

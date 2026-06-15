@@ -25,7 +25,7 @@ with `@inkress/admin-sdk`. Fully backward compatible.
   per SDK instance — no cross-request bleed), and a robust fallback when a
   `localStorage` write throws (Safari private mode / quota).
 - **`checkout:started`** event.
-- Comprehensive README, examples, and a 65+ case test suite.
+- Comprehensive README, examples, and an extensive jest test suite.
 
 ### Changed
 - `HttpClient` now resolves endpoints from `mode` (was a hardcoded endpoint),

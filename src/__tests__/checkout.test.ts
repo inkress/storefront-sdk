@@ -30,6 +30,12 @@ describe('CheckoutResource.createPaymentUrl', () => {
     const checkout = new CheckoutResource(new HttpClient());
     expect(() => checkout.createPaymentUrl({ total: 10 })).toThrow(/merchant username is required/i);
   });
+
+  it('rejects a zero or negative total', () => {
+    const checkout = new CheckoutResource(new HttpClient({ merchantUsername: 'acme' }));
+    expect(() => checkout.createPaymentUrl({ total: 0 })).toThrow(/positive total/i);
+    expect(() => checkout.createPaymentUrl({ total: -5 })).toThrow(/positive total/i);
+  });
 });
 
 describe('CheckoutResource sessions', () => {
@@ -48,6 +54,14 @@ describe('CheckoutResource sessions', () => {
     await new CheckoutResource(new HttpClient({ merchantUsername: 'acme' })).getSession('S.1');
     expect(lastCall()[0]).toContain('/api/v1/checkout/sessions/S.1');
   });
+
+  it('cancelSession DELETEs /checkout/sessions/:id', async () => {
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', result: { status: 'cancelled', session_id: 'S.1' } }));
+    const res = await new CheckoutResource(new HttpClient({ merchantUsername: 'acme' })).cancelSession('S.1');
+    expect(lastCall()[0]).toContain('/api/v1/checkout/sessions/S.1');
+    expect((lastCall()[1] as RequestInit).method).toBe('DELETE');
+    expect(res.result?.status).toBe('cancelled');
+  });
 });
 
 describe('CheckoutResource.redirectToCheckout', () => {
@@ -65,11 +79,21 @@ describe('CheckoutResource.redirectToCheckout', () => {
   });
 
   it('redirects via window.location.assign in the browser', () => {
+    const original = Object.getOwnPropertyDescriptor(window, 'location');
     const assign = jest.fn();
     Object.defineProperty(window, 'location', { value: { assign }, writable: true, configurable: true });
+    try {
+      const checkout = new CheckoutResource(new HttpClient());
+      expect(checkout.redirectToCheckout({ frame_url: 'https://pay/y' })).toBe(true);
+      expect(assign).toHaveBeenCalledWith('https://pay/y');
+    } finally {
+      if (original) Object.defineProperty(window, 'location', original);
+    }
+  });
+
+  it('rejects a non-navigational (javascript:) URL', () => {
     const checkout = new CheckoutResource(new HttpClient());
-    expect(checkout.redirectToCheckout({ frame_url: 'https://pay/y' })).toBe(true);
-    expect(assign).toHaveBeenCalledWith('https://pay/y');
+    expect(() => checkout.redirectToCheckout('javascript:alert(1)')).toThrow(/absolute http/i);
   });
 });
 
@@ -108,5 +132,20 @@ describe('cart.checkout() via the SDK facade', () => {
     const sdk = InkressStorefrontSDK.forMerchant('acme');
     sdk.cart.clear();
     await expect(sdk.cart.checkout()).rejects.toThrow(/empty cart/i);
+  });
+
+  it('throws on a mixed-currency cart unless currency_code is given', async () => {
+    const sdk = InkressStorefrontSDK.forMerchant('acme');
+    sdk.cart.clear();
+    const usd = product(1, 30);
+    const jmd = { ...product(2, 10), currency: { id: 2, code: 'JMD', symbol: '$', name: 'Jamaican Dollar' } };
+    sdk.cart.addItem(usd, 1);
+    sdk.cart.addItem(jmd, 1);
+    await expect(sdk.cart.checkout()).rejects.toThrow(/multiple currencies/i);
+
+    // Explicit currency_code resolves the ambiguity.
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', result: { session_id: 'S.3' } }));
+    const res = await sdk.cart.checkout({ currency_code: 'USD' });
+    expect(res.result?.session_id).toBe('S.3');
   });
 });
