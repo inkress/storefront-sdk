@@ -131,7 +131,7 @@ export class HttpClient {
     const { method = 'GET', body, headers: requestHeaders, timeout } = options;
 
     const headers = this.getHeaders(requestHeaders);
-    const requestTimeout = timeout || this.config.timeout;
+    const requestTimeout = timeout ?? this.config.timeout;
 
     const requestInit: RequestInit = { method, headers };
 
@@ -146,12 +146,15 @@ export class HttpClient {
       }
     }
 
+    // Clear the timer once the race settles so it can't leak / fire late.
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new InkressApiError('Request timeout', 0)), requestTimeout);
+      timer = setTimeout(() => reject(new InkressApiError('Request timeout', 0)), requestTimeout);
     });
 
     try {
       const response = await Promise.race([fetch(url, requestInit), timeoutPromise]);
+      if (timer) clearTimeout(timer);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -174,6 +177,7 @@ export class HttpClient {
       }
       return JSON.parse(responseText) as ApiResponse<T>;
     } catch (error) {
+      if (timer) clearTimeout(timer);
       if (error instanceof InkressApiError) {
         throw error;
       }
@@ -246,12 +250,14 @@ export class HttpClient {
   }
 
   updateConfig(newConfig: Partial<StorefrontConfig>): void {
-    // Re-resolve so a mode change recomputes derived endpoints, while explicit
-    // overrides already present are preserved unless overridden again.
+    // Re-resolve so a *mode change* recomputes derived endpoints, while a custom
+    // endpoint/siteUrl already in effect is preserved unless overridden again
+    // (and is NOT discarded when the caller passes the same mode explicitly).
+    const modeChanged = newConfig.mode !== undefined && newConfig.mode !== this.config.mode;
     const merged: StorefrontConfig = {
       mode: newConfig.mode ?? this.config.mode,
-      endpoint: newConfig.endpoint ?? (newConfig.mode ? undefined : this.config.endpoint),
-      siteUrl: newConfig.siteUrl ?? (newConfig.mode ? undefined : this.config.siteUrl),
+      endpoint: newConfig.endpoint ?? (modeChanged ? undefined : this.config.endpoint),
+      siteUrl: newConfig.siteUrl ?? (modeChanged ? undefined : this.config.siteUrl),
       apiVersion: newConfig.apiVersion ?? this.config.apiVersion,
       merchantUsername: newConfig.merchantUsername ?? this.config.merchantUsername,
       authToken: newConfig.authToken ?? this.config.authToken,

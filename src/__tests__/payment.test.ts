@@ -57,4 +57,36 @@ describe('payment utils', () => {
     const url = inkress.createPaymentUrl({ username: 'acme', total: 5 });
     expect(url).toContain('https://inkress.com/merchants/acme/order?');
   });
+
+  it('percent-encodes order_token in the raw query string', () => {
+    const url = buildPaymentUrl(
+      { username: 'acme', total: 123.45, reference_id: 'ref-special' },
+      'https://inkress.com'
+    );
+    const rawToken = url.split('order_token=')[1];
+    const decodedToken = new URL(url).searchParams.get('order_token')!;
+    // The raw query value is the percent-encoded form of the decoded token, so a
+    // server that URL-decodes params reconstructs the exact base64 (no +,/,= loss).
+    expect(rawToken).toBe(encodeURIComponent(decodedToken));
+    expect(decodeB64ToJSON<any>(decodedToken).reference_id).toBe('ref-special');
+  });
+
+  it('omits link_token entirely when no payment_link_id is given', () => {
+    const url = buildPaymentUrl({ username: 'acme', total: 10 }, 'https://inkress.com');
+    expect(url).not.toContain('link_token');
+    expect(new URL(url).searchParams.has('link_token')).toBe(false);
+  });
+
+  it('round-trips via the btoa/atob browser path when Buffer is absent', () => {
+    const original = (globalThis as any).Buffer;
+    // Simulate a browser with no Node Buffer global.
+    (globalThis as any).Buffer = undefined;
+    try {
+      const data = { total: 42, note: 'unicode ☕ €' };
+      const token = encodeJSONToB64(data);
+      expect(decodeB64ToJSON(token)).toEqual(data);
+    } finally {
+      (globalThis as any).Buffer = original;
+    }
+  });
 });

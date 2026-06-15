@@ -339,13 +339,9 @@ export interface ProductSearchParams extends PaginationParams {
   [key: string]: any; // Allow additional filters
 }
 
-// Configuration and error types (re-exported from client)
-export type { 
-  StorefrontConfig, 
-  ApiResponse, 
-  ErrorResponse, 
-  InkressApiError 
-} from './client';
+// Configuration & error types (re-exported from client).
+// InkressApiError is a class and is value-exported from the package root.
+export type { StorefrontConfig, ApiResponse, ErrorResponse, SdkMode } from './client';
 
 // Generic types for key-value store
 export interface Generic {

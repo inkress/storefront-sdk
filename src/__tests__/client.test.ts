@@ -85,4 +85,20 @@ describe('HttpClient', () => {
     expect(lastCall()[0]).toBe('https://api-dev.inkress.com/api/v1/ping');
     expect(client.getSiteUrl()).toBe('https://dev.inkress.com');
   });
+
+  it('preserves a custom endpoint across a non-mode updateConfig', async () => {
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', result: {} }));
+    const client = new HttpClient({ endpoint: 'https://self.example.com' });
+    client.updateConfig({ authToken: 'tok' });
+    await client.get('/ping');
+    expect(lastCall()[0]).toBe('https://self.example.com/api/v1/ping');
+  });
+
+  it('preserves a custom endpoint when the same mode is passed explicitly', async () => {
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', result: {} }));
+    const client = new HttpClient({ mode: 'live', endpoint: 'https://self.example.com' });
+    client.updateConfig({ mode: 'live' }); // same mode — must NOT discard the override
+    await client.get('/ping');
+    expect(lastCall()[0]).toBe('https://self.example.com/api/v1/ping');
+  });
 });

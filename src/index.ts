@@ -19,7 +19,8 @@ import { FilesResource } from './resources/files';
 // Re-export types for convenience
 export * from './types';
 export { InkressApiError } from './client';
-export type { HttpClient, ApiResponse, RequestOptions, SdkMode } from './client';
+// ApiResponse/StorefrontConfig/ErrorResponse come through `export * from './types'`.
+export type { HttpClient, RequestOptions, SdkMode } from './client';
 
 // Re-export payment helpers so consumers can build hosted-checkout URLs directly.
 export {

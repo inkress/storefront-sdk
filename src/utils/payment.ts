@@ -33,21 +33,20 @@ export interface PaymentURLOptions {
  * browser (btoa) and on the server (Buffer) without statically referencing
  * Node globals (so bundlers targeting the browser don't choke).
  */
+function getBuffer(): typeof globalThis.Buffer | null {
+  // Referenced directly (no eval / new Function) so it is CSP-safe in the
+  // browser; bundlers targeting the browser see `typeof Buffer === 'undefined'`
+  // at runtime and the btoa/atob path is taken instead.
+  return typeof Buffer !== 'undefined' ? Buffer : null;
+}
+
 export function encodeJSONToB64(data: unknown): string {
   const jsonStr = JSON.stringify(data);
-  const isBrowser = typeof window !== 'undefined' && typeof window.btoa === 'function';
-
-  if (!isBrowser) {
-    // Server: use Buffer if present, resolved indirectly to avoid bundler issues.
-    const BufferRef = new Function(
-      'return typeof Buffer !== "undefined" ? Buffer : null'
-    )() as { from(s: string): { toString(enc: string): string } } | null;
-    if (BufferRef) {
-      return BufferRef.from(jsonStr).toString('base64');
-    }
+  const buf = getBuffer();
+  if (buf) {
+    return buf.from(jsonStr, 'utf-8').toString('base64');
   }
-
-  // Browser / fallback. unescape(encodeURIComponent(...)) makes btoa UTF-8 safe.
+  // Browser. unescape(encodeURIComponent(...)) makes btoa UTF-8 safe.
   return btoa(unescape(encodeURIComponent(jsonStr)));
 }
 
@@ -56,21 +55,11 @@ export function encodeJSONToB64(data: unknown): string {
  * and consumers that want to inspect a token they generated.
  */
 export function decodeB64ToJSON<T = unknown>(token: string): T {
-  let jsonStr: string;
-  const isBrowser = typeof window !== 'undefined' && typeof window.atob === 'function';
-
-  if (!isBrowser) {
-    const BufferRef = new Function(
-      'return typeof Buffer !== "undefined" ? Buffer : null'
-    )() as { from(s: string, enc: string): { toString(enc: string): string } } | null;
-    if (BufferRef) {
-      jsonStr = BufferRef.from(token, 'base64').toString('utf-8');
-      return JSON.parse(jsonStr) as T;
-    }
+  const buf = getBuffer();
+  if (buf) {
+    return JSON.parse(buf.from(token, 'base64').toString('utf-8')) as T;
   }
-
-  jsonStr = decodeURIComponent(escape(atob(token)));
-  return JSON.parse(jsonStr) as T;
+  return JSON.parse(decodeURIComponent(escape(atob(token)))) as T;
 }
 
 /** Generate a random alphanumeric reference id. */
@@ -127,7 +116,12 @@ export function buildPaymentUrl(options: PaymentURLOptions, siteBaseUrl: string)
     },
   };
 
-  const orderToken = encodeJSONToB64(orderData);
   const base = siteBaseUrl.replace(/\/+$/, '');
-  return `${base}/merchants/${encodeURIComponent(username)}/order?link_token=${payment_link_id || ''}&order_token=${orderToken}`;
+  // URLSearchParams percent-encodes the base64 token (which contains +, /, =)
+  // and omits link_token entirely when no payment link is supplied.
+  const params = new URLSearchParams({ order_token: encodeJSONToB64(orderData) });
+  if (payment_link_id) {
+    params.set('link_token', payment_link_id);
+  }
+  return `${base}/merchants/${encodeURIComponent(username)}/order?${params.toString()}`;
 }
