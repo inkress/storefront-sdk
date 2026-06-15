@@ -1,19 +1,25 @@
 import fetch from 'cross-fetch';
 
+export type SdkMode = 'live' | 'sandbox';
+
 export interface StorefrontConfig {
-  /** API endpoint URL */
+  /** Environment mode. Resolves the API + site endpoints. Default: 'live'. */
+  mode?: SdkMode;
+  /** Override the API endpoint origin (advanced). Normally derived from `mode`. */
   endpoint?: string;
-  /** API version */
+  /** Override the public site origin used for hosted-checkout URLs. Derived from `mode`. */
+  siteUrl?: string;
+  /** API version path segment. Default: 'v1'. */
   apiVersion?: string;
-  /** Merchant username for public endpoints */
+  /** Merchant username for public endpoints. Sent as `Client-Id: m-<username>`. */
   merchantUsername?: string;
-  /** Customer auth token for authenticated endpoints */
+  /** Customer auth token (Bearer) for authenticated endpoints. */
   authToken?: string;
-  /** Request timeout in milliseconds */
+  /** Request timeout in milliseconds. Default: 30000. */
   timeout?: number;
-  /** Number of retry attempts */
+  /** Number of retry attempts on 5xx/timeout. Default: 0. */
   retries?: number;
-  /** Custom headers to include with requests */
+  /** Custom headers merged into every request. */
   headers?: Record<string, string>;
 }
 
@@ -26,18 +32,25 @@ export interface RequestOptions {
 
 export interface ApiResponse<T = any> {
   state: 'ok' | 'error';
-  data?: any; // May contain simple data or be null
-  result?: T; // Contains the actual response data (single item or paginated list)
+  /** Present on some endpoints; may be simple data or null. */
+  data?: any;
+  /** The actual payload — a single item or a paginated list. */
+  result?: T;
 }
 
 export interface ErrorResponse {
   state: 'error';
-  data: 
+  data:
     | { result: string }
     | { reason: string }
     | string
-    | Record<string, string[]>; // validation errors
+    | Record<string, string[]>;
 }
+
+const LIVE_API = 'https://api.inkress.com';
+const SANDBOX_API = 'https://api-dev.inkress.com';
+const LIVE_SITE = 'https://inkress.com';
+const SANDBOX_SITE = 'https://dev.inkress.com';
 
 export class InkressApiError extends Error {
   public readonly status: number;
@@ -49,32 +62,53 @@ export class InkressApiError extends Error {
     this.name = 'InkressApiError';
     this.status = status;
     this.details = details;
-    
     if (details?.code) {
       this.code = details.code;
     }
   }
 }
 
-export class HttpClient {
-  private config: Required<StorefrontConfig>;
+/** Resolved, fully-defaulted config including derived endpoints. */
+type ResolvedConfig = Required<Omit<StorefrontConfig, 'endpoint' | 'siteUrl'>> & {
+  endpoint: string;
+  siteUrl: string;
+};
 
-  constructor(config: StorefrontConfig) {
-    this.config = {
-      endpoint: 'https://api.inkress.com',
-      apiVersion: 'v1',
-      merchantUsername: '',
-      authToken: '',
-      timeout: 30000,
-      retries: 0,
-      headers: {},
-      ...config,
+export class HttpClient {
+  private config: ResolvedConfig;
+
+  constructor(config: StorefrontConfig = {}) {
+    this.config = HttpClient.resolveConfig(config);
+  }
+
+  private static resolveConfig(config: StorefrontConfig): ResolvedConfig {
+    const mode: SdkMode = config.mode || 'live';
+    const endpoint = config.endpoint || (mode === 'sandbox' ? SANDBOX_API : LIVE_API);
+    const siteUrl = config.siteUrl || (mode === 'sandbox' ? SANDBOX_SITE : LIVE_SITE);
+    return {
+      mode,
+      endpoint,
+      siteUrl,
+      apiVersion: config.apiVersion || 'v1',
+      merchantUsername: config.merchantUsername || '',
+      authToken: config.authToken || '',
+      timeout: config.timeout ?? 30000,
+      retries: config.retries ?? 0,
+      headers: config.headers || {},
     };
   }
 
   private getBaseUrl(): string {
-    const { endpoint, apiVersion } = this.config;
-    return `${endpoint}/api/${apiVersion}`;
+    return `${this.config.endpoint}/api/${this.config.apiVersion}`;
+  }
+
+  /** Public site origin (for hosted checkout URLs), not the API endpoint. */
+  getSiteUrl(): string {
+    return this.config.siteUrl;
+  }
+
+  getMerchantUsername(): string {
+    return this.config.merchantUsername;
   }
 
   private getHeaders(additionalHeaders: Record<string, string> = {}): Record<string, string> {
@@ -83,63 +117,55 @@ export class HttpClient {
       ...this.config.headers,
       ...additionalHeaders,
     };
-
-    // Add auth header if token is available
     if (this.config.authToken) {
       headers['Authorization'] = `Bearer ${this.config.authToken}`;
     }
-
-    // Add auth header if token is available
     if (this.config.merchantUsername) {
-      headers['client-id'] = `m-${this.config.merchantUsername}`;
+      headers['Client-Id'] = `m-${this.config.merchantUsername}`;
     }
-
     return headers;
   }
 
-  private async makeRequest<T>(
-    path: string,
-    options: RequestOptions = {}
-  ): Promise<ApiResponse<T>> {
+  private async makeRequest<T>(path: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
     const url = `${this.getBaseUrl()}${path}`;
     const { method = 'GET', body, headers: requestHeaders, timeout } = options;
 
     const headers = this.getHeaders(requestHeaders);
-    const requestTimeout = timeout || this.config.timeout;
+    const requestTimeout = timeout ?? this.config.timeout;
 
-    // eslint-disable-next-line no-undef
-    const requestInit: RequestInit = {
-      method,
-      headers,
-    };
+    const requestInit: RequestInit = { method, headers };
 
+    // Let FormData set its own multipart boundary; only JSON-encode plain bodies.
     if (body && method !== 'GET') {
-      requestInit.body = typeof body === 'string' ? body : JSON.stringify(body);
+      const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+      if (isFormData) {
+        delete headers['Content-Type'];
+        requestInit.body = body;
+      } else {
+        requestInit.body = typeof body === 'string' ? body : JSON.stringify(body);
+      }
     }
 
-    // Create timeout promise
+    // Clear the timer once the race settles so it can't leak / fire late.
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout')), requestTimeout);
+      timer = setTimeout(() => reject(new InkressApiError('Request timeout', 0)), requestTimeout);
     });
 
     try {
-      const response = await Promise.race([
-        fetch(url, requestInit),
-        timeoutPromise,
-      ]);
+      const response = await Promise.race([fetch(url, requestInit), timeoutPromise]);
+      if (timer) clearTimeout(timer);
 
       if (!response.ok) {
         const errorText = await response.text();
         let errorData: any;
-        
         try {
           errorData = JSON.parse(errorText);
         } catch {
           errorData = { message: errorText || `HTTP ${response.status}` };
         }
-
         throw new InkressApiError(
-          errorData.message || `HTTP ${response.status}`,
+          errorData.message || errorData.reason || `HTTP ${response.status}`,
           response.status,
           errorData
         );
@@ -147,20 +173,15 @@ export class HttpClient {
 
       const responseText = await response.text();
       if (!responseText) {
-        return { state: 'ok', data: undefined as T };
+        return { state: 'ok', result: undefined as unknown as T };
       }
-
-      const data = JSON.parse(responseText);
-      return data as ApiResponse<T>;
+      return JSON.parse(responseText) as ApiResponse<T>;
     } catch (error) {
+      if (timer) clearTimeout(timer);
       if (error instanceof InkressApiError) {
         throw error;
       }
-      throw new InkressApiError(
-        error instanceof Error ? error.message : 'Unknown error',
-        0,
-        { error }
-      );
+      throw new InkressApiError(error instanceof Error ? error.message : 'Unknown error', 0, { error });
     }
   }
 
@@ -182,17 +203,20 @@ export class HttpClient {
 
   private shouldRetry(error: any): boolean {
     if (error instanceof InkressApiError) {
-      // Retry on 5xx errors and timeouts
       return error.status >= 500 || error.status === 0;
     }
     return false;
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  async get<T>(path: string, params?: Record<string, any>, options?: Omit<RequestOptions, 'method' | 'body'>): Promise<ApiResponse<T>> {
+  async get<T>(
+    path: string,
+    params?: Record<string, any>,
+    options?: Omit<RequestOptions, 'method' | 'body'>
+  ): Promise<ApiResponse<T>> {
     let url = path;
     if (params) {
       const searchParams = new URLSearchParams();
@@ -206,7 +230,6 @@ export class HttpClient {
         url += `?${queryString}`;
       }
     }
-    
     return this.retryRequest<T>(url, { ...options, method: 'GET' });
   }
 
@@ -227,11 +250,27 @@ export class HttpClient {
   }
 
   updateConfig(newConfig: Partial<StorefrontConfig>): void {
-    this.config = { ...this.config, ...newConfig };
+    // Re-resolve so a *mode change* recomputes derived endpoints, while a custom
+    // endpoint/siteUrl already in effect is preserved unless overridden again
+    // (and is NOT discarded when the caller passes the same mode explicitly).
+    const modeChanged = newConfig.mode !== undefined && newConfig.mode !== this.config.mode;
+    const merged: StorefrontConfig = {
+      mode: newConfig.mode ?? this.config.mode,
+      endpoint: newConfig.endpoint ?? (modeChanged ? undefined : this.config.endpoint),
+      siteUrl: newConfig.siteUrl ?? (modeChanged ? undefined : this.config.siteUrl),
+      apiVersion: newConfig.apiVersion ?? this.config.apiVersion,
+      merchantUsername: newConfig.merchantUsername ?? this.config.merchantUsername,
+      authToken: newConfig.authToken ?? this.config.authToken,
+      timeout: newConfig.timeout ?? this.config.timeout,
+      retries: newConfig.retries ?? this.config.retries,
+      headers: newConfig.headers ?? this.config.headers,
+    };
+    this.config = HttpClient.resolveConfig(merged);
   }
 
+  /** Current config with the auth token stripped. */
   getConfig(): Omit<StorefrontConfig, 'authToken'> {
-    const { authToken: _authToken, ...config } = this.config;
-    return config;
+    const { authToken: _authToken, ...rest } = this.config;
+    return rest;
   }
 }

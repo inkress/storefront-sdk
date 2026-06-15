@@ -19,6 +19,24 @@ import { FilesResource } from './resources/files';
 // Re-export types for convenience
 export * from './types';
 export { InkressApiError } from './client';
+// ApiResponse/StorefrontConfig/ErrorResponse come through `export * from './types'`.
+export type { HttpClient, RequestOptions, SdkMode } from './client';
+
+// Re-export payment helpers so consumers can build hosted-checkout URLs directly.
+export {
+  buildPaymentUrl,
+  encodeJSONToB64,
+  decodeB64ToJSON,
+  generateRandomId,
+  validatePaymentOptions,
+  type PaymentURLOptions,
+  type PaymentCustomer,
+} from './utils/payment';
+import {
+  buildPaymentUrl as _buildPaymentUrl,
+  generateRandomId as _generateRandomId,
+  type PaymentURLOptions as _PaymentURLOptions,
+} from './utils/payment';
 
 /**
  * Main Inkress Storefront SDK class
@@ -276,8 +294,8 @@ export class InkressStorefrontSDK {
    * Create SDK instance for specific merchant with authentication
    */
   static forMerchantWithAuth(
-    merchantUsername: string, 
-    authToken: string, 
+    merchantUsername: string,
+    authToken: string,
     config: Omit<StorefrontConfig, 'merchantUsername' | 'authToken'> = {}
   ): InkressStorefrontSDK {
     return new InkressStorefrontSDK({
@@ -287,3 +305,47 @@ export class InkressStorefrontSDK {
     });
   }
 }
+
+// ---------------------------------------------------------------------------
+// Back-compat shim
+// ---------------------------------------------------------------------------
+/**
+ * Legacy v0.0.1 `Inkress` class. Preserved so existing `createPaymentUrl`
+ * users keep working after upgrading. Prefer {@link InkressStorefrontSDK} and
+ * its checkout resource for new code.
+ *
+ * @deprecated Use {@link InkressStorefrontSDK}.
+ */
+export class Inkress {
+  private clientKey: string;
+  private token: string;
+  private siteBaseUrl: string;
+
+  constructor({
+    clientKey = '',
+    token = '',
+    mode = 'live',
+  }: { clientKey?: string; token?: string; mode?: 'live' | 'test' } = {}) {
+    this.clientKey = clientKey;
+    this.token = token;
+    this.siteBaseUrl = mode === 'live' ? 'https://inkress.com' : 'https://dev.inkress.com';
+  }
+
+  setClient(clientKey: string): void {
+    this.clientKey = clientKey;
+  }
+
+  setToken(token: string): void {
+    this.token = token;
+  }
+
+  generateRandomId(): string {
+    return _generateRandomId();
+  }
+
+  createPaymentUrl(options: _PaymentURLOptions): string {
+    return _buildPaymentUrl(options, this.siteBaseUrl);
+  }
+}
+
+export { InkressStorefrontSDK as default };

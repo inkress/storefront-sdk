@@ -1,73 +1,72 @@
-import { defineConfig } from 'rollup';
-import typescript from '@rollup/plugin-typescript';
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
+import typescript from '@rollup/plugin-typescript';
+import terser from '@rollup/plugin-terser';
 
-const isProduction = process.env.NODE_ENV === 'production';
-
-export default defineConfig([
-  // ES Module build
+const config = [
+  // ES Module build (also emits .d.ts declarations)
   {
     input: 'src/index.ts',
     output: {
       file: 'dist/index.esm.js',
-      format: 'es',
+      format: 'esm',
       sourcemap: true,
     },
     plugins: [
-      resolve({ 
-        browser: false,
-        preferBuiltins: true 
-      }),
+      resolve({ browser: true, preferBuiltins: false }),
       commonjs(),
       typescript({
-        tsconfig: './tsconfig.json',
-        outputToFilesystem: true,
+        declaration: true,
+        declarationDir: 'dist',
+        rootDir: 'src',
+        exclude: ['**/*.test.ts', '**/__tests__/**'],
       }),
     ],
     external: ['cross-fetch'],
   },
-  // CommonJS build  
+  // CommonJS build
   {
     input: 'src/index.ts',
     output: {
-      file: 'dist/index.js',
+      file: 'dist/index.cjs',
       format: 'cjs',
       exports: 'named',
       sourcemap: true,
     },
     plugins: [
-      resolve({ 
-        browser: false,
-        preferBuiltins: true 
-      }),
+      resolve({ browser: true, preferBuiltins: false }),
       commonjs(),
       typescript({
-        tsconfig: './tsconfig.json',
-        outputToFilesystem: false,
+        declaration: false,
+        declarationMap: false,
+        rootDir: 'src',
+        exclude: ['**/*.test.ts', '**/__tests__/**'],
       }),
     ],
     external: ['cross-fetch'],
   },
-  // Browser build (UMD with dependencies bundled)
+  // Browser UMD build (dependencies bundled + minified)
   {
     input: 'src/index.ts',
     output: {
       file: 'dist/index.browser.js',
       format: 'umd',
       name: 'InkressStorefront',
+      exports: 'named',
       sourcemap: true,
     },
     plugins: [
-      resolve({ 
-        browser: true,
-        preferBuiltins: false 
-      }),
+      resolve({ browser: true, preferBuiltins: false }),
       commonjs(),
       typescript({
-        tsconfig: './tsconfig.json',
-        outputToFilesystem: false,
+        declaration: false,
+        declarationMap: false,
+        rootDir: 'src',
+        exclude: ['**/*.test.ts', '**/__tests__/**'],
       }),
+      terser(),
     ],
   },
-]);
+];
+
+export default config;
