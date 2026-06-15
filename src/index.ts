@@ -15,6 +15,11 @@ import { GenericsResource } from './resources/generics';
 import { ReviewsResource } from './resources/reviews';
 import { ShippingResource } from './resources/shipping';
 import { FilesResource } from './resources/files';
+import { CheckoutResource } from './resources/checkout';
+
+export * from './types/checkout';
+export { CheckoutResource } from './resources/checkout';
+export type { CheckoutInitiator, CartCheckoutOptions } from './resources/cart';
 
 // Re-export types for convenience
 export * from './types';
@@ -146,6 +151,7 @@ export class InkressStorefrontSDK {
   public readonly reviews: ReviewsResource;
   public readonly shipping: ShippingResource;
   public readonly files: FilesResource;
+  public readonly checkout: CheckoutResource;
 
   constructor(config: StorefrontConfig = {}) {
     // Initialize core components
@@ -164,17 +170,20 @@ export class InkressStorefrontSDK {
     this.reviews = new ReviewsResource(this.client);
     this.shipping = new ShippingResource(this.client);
     this.files = new FilesResource(this.client);
-    
+    this.checkout = new CheckoutResource(this.client);
+
     // Initialize cart and wishlist with storage, events, and client
     this.cart = new CartResource(
       this.storageManager.createStorage('cart'),
       this.eventEmitter,
       this.client
     );
-    
+    // Let cart.checkout() open a session via the checkout resource.
+    this.cart.setCheckout(this.checkout);
+
     this.generic = new GenericResource(this.client);
     this.generics = new GenericsResource(this.client);
-    
+
     this.wishlist = new WishlistResource(
       this.storageManager.createStorage('wishlist'),
       this.eventEmitter,
