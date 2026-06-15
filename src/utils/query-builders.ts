@@ -91,7 +91,7 @@ export class ProductQueryBuilder extends QueryBuilder<Product> {
  *
  * @example
  * const cats = await sdk.categories.createQueryBuilder()
- *   .whereRootOnly()
+ *   .whereParent(7)
  *   .whereNameContains('apparel')
  *   .execute();
  */

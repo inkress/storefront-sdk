@@ -164,8 +164,7 @@ export class ReviewsResource implements Queryable<ReviewListResponse> {
    * @returns Promise resolving to paginated list of matching reviews
    */
   async search(query: string, params?: ReviewListParams): Promise<ApiResponse<PaginatedResponse<Review>>> {
-    // Note: Search functionality would depend on API support
-    return this.list({ ...params });
+    return this.list({ ...params, q: query } as ReviewListParams);
   }
 
   // Review moderation and management methods

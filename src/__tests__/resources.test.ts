@@ -56,13 +56,27 @@ describe('ProductsResource', () => {
     expect(lastUrl()).toContain('/api/v1/products/7');
     expect(res.result).toEqual({ id: 7 });
   });
+
+  it('query() rejects on an unmapped status string (translation throws)', async () => {
+    await expect(new ProductsResource(client).query({ status: 'live' as any })).rejects.toThrow(/Unknown status value/);
+  });
 });
 
 describe('CategoriesResource', () => {
-  it('query() flattens contains filters', async () => {
+  it('query() hits /categories and flattens contains filters', async () => {
     fetchMock.mockResponseOnce(okList());
     await new CategoriesResource(client).query({ name: { contains: 'apparel' } });
-    expect(decodeURIComponent(lastUrl())).toContain('contains.name=apparel');
+    const url = decodeURIComponent(lastUrl());
+    expect(url).toContain('/api/v1/categories?');
+    expect(url).toContain('contains.name=apparel');
+  });
+
+  it('createQueryBuilder().whereParent + whereNameContains builds the query', async () => {
+    fetchMock.mockResponseOnce(okList());
+    await new CategoriesResource(client).createQueryBuilder().whereParent(7).whereNameContains('shoes').execute();
+    const url = decodeURIComponent(lastUrl());
+    expect(url).toContain('parent_id=7');
+    expect(url).toContain('contains.name=shoes');
   });
 });
 
@@ -74,6 +88,10 @@ describe('OrdersResource', () => {
     expect(url).toContain('status=completed'); // string status passes through
     expect(url).toContain('kind=1'); // order_online -> 1
     expect(url).toContain('total_min=100');
+  });
+
+  it('query() rejects on an unmapped kind string (translation throws)', async () => {
+    await expect(new OrdersResource(client).query({ kind: 'teleport' as any })).rejects.toThrow(/Unknown kind value/);
   });
 
   it('getByReference() unwraps the first entry', async () => {
