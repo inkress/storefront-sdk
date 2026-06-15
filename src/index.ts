@@ -190,9 +190,11 @@ export class InkressStorefrontSDK {
 
     // Re-point the per-merchant storage namespace if the merchant changed. This
     // updates the existing storage instances in place, so the cart/wishlist
-    // resource references consumers already hold remain valid.
+    // resource references consumers already hold remain valid. The customer
+    // (wishlist) user id is cleared, since it belonged to the previous context.
     if (newConfig.merchantUsername) {
       this.storageManager.setPrefix(`inkress-${newConfig.merchantUsername}`);
+      this.wishlist.setUserId(undefined);
     }
   }
 

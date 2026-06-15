@@ -36,6 +36,22 @@ describe('BrowserStorage', () => {
       (globalThis as any).window = realWindow;
     }
   });
+
+  it('falls back to memory when localStorage.setItem throws (Safari private mode)', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const real = window.localStorage.setItem;
+    (window.localStorage as any).setItem = () => {
+      throw new DOMException('QuotaExceededError');
+    };
+    try {
+      const s = new BrowserStorage<string>('pm', 'safari');
+      expect(s.set('value')).toBe(true); // write didn't silently drop
+      expect(s.get()).toBe('value'); // served from the memory fallback
+    } finally {
+      (window.localStorage as any).setItem = real;
+      warn.mockRestore();
+    }
+  });
 });
 
 describe('StorageManager', () => {
@@ -58,5 +74,24 @@ describe('StorageManager', () => {
     a.clearAll();
     expect(a.getAllKeys()).toHaveLength(0);
     expect(b.getAllKeys()).toContain('y');
+  });
+
+  it('in-memory fallback is isolated per manager (no cross-request bleed)', () => {
+    const realWindow = (globalThis as any).window;
+    delete (globalThis as any).window; // force the in-memory path
+    try {
+      // Two managers, SAME prefix + key — mimics two concurrent SSR requests
+      // for the same merchant. Their carts must not bleed into each other.
+      const reqA = new StorageManager('inkress-acme');
+      const reqB = new StorageManager('inkress-acme');
+      const cartA = reqA.createStorage<{ n: number }>('cart');
+      const cartB = reqB.createStorage<{ n: number }>('cart');
+      cartA.set({ n: 1 });
+      cartB.set({ n: 2 });
+      expect(cartA.get()).toEqual({ n: 1 });
+      expect(cartB.get()).toEqual({ n: 2 });
+    } finally {
+      (globalThis as any).window = realWindow;
+    }
   });
 });
