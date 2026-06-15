@@ -1,30 +1,54 @@
 import type { HttpClient } from '../client';
-import type { 
-  ApiResponse, 
+import type {
+  ApiResponse,
   PaginatedResponse,
   Category,
   CategoryInput,
-  CategoryListParams
+  CategoryListParams,
+  CategoryTree,
 } from '../types';
+import { processQuery } from '../utils/query-transformer';
+import { CategoryQueryBuilder, type Queryable } from '../utils/query-builders';
+import {
+  CATEGORY_FIELD_TYPES,
+  QUERY_CONTEXT,
+  type CategoryQueryParams,
+  type CategoryListResponse,
+} from '../types/resources';
 
 /**
  * Categories resource for managing product categories
- * 
+ *
  * Categories provide a way to organize products into hierarchical groups.
  * They support nested structures through parent_id relationships and can
  * be filtered by various criteria including kind, name, and description.
  */
-export class CategoriesResource {
+export class CategoriesResource implements Queryable<CategoryListResponse> {
   constructor(private client: HttpClient) {}
 
   /**
    * List categories with optional filtering and pagination
-   * 
+   *
    * @param params - Query parameters for filtering and pagination
    * @returns Promise resolving to paginated list of categories
    */
   async list(params?: CategoryListParams): Promise<ApiResponse<PaginatedResponse<Category>>> {
     return this.client.get<PaginatedResponse<Category>>('/categories', params);
+  }
+
+  /**
+   * Run a typed category query (range/contains/date filters + pagination).
+   *
+   * @example await categories.query({ name: { contains: 'apparel' }, page: 1 })
+   */
+  async query(params?: CategoryQueryParams): Promise<ApiResponse<CategoryListResponse>> {
+    const processed = processQuery(params || {}, CATEGORY_FIELD_TYPES, { context: QUERY_CONTEXT.category });
+    return this.client.get<CategoryListResponse>('/categories', processed);
+  }
+
+  /** Start a fluent category query. */
+  createQueryBuilder(initialQuery?: CategoryQueryParams): CategoryQueryBuilder {
+    return new CategoryQueryBuilder(this, initialQuery);
   }
 
   /**
@@ -147,9 +171,8 @@ export class CategoriesResource {
 
       // Build tree recursively
       const tree: CategoryTree[] = [];
-      // getRoots returns PaginatedResponse<Category>, so access entries
-      const rootCategories = (rootsResponse.result as any).entries;
-      
+      const rootCategories = rootsResponse.result.entries;
+
       for (const category of rootCategories) {
         const categoryWithChildren = await this.buildCategoryTree(category, maxDepth - 1);
         tree.push(categoryWithChildren);
@@ -182,9 +205,7 @@ export class CategoriesResource {
       const childrenResponse = await this.getChildren(category.id, { page_size: 100 });
       
       if (childrenResponse.state === 'ok' && childrenResponse.result) {
-        // getChildren returns PaginatedResponse<Category>, so access entries
-        const children = (childrenResponse.result as any).entries;
-        
+        const children = childrenResponse.result.entries;
         for (const child of children) {
           const childWithChildren = await this.buildCategoryTree(child, depth - 1);
           categoryTree.children.push(childWithChildren);
@@ -196,9 +217,4 @@ export class CategoriesResource {
   }
 }
 
-/**
- * Category tree structure for hierarchical display
- */
-export interface CategoryTree extends Category {
-  children: CategoryTree[];
-}
+// CategoryTree is defined in ../types and re-exported from the package root.

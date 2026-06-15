@@ -5,11 +5,24 @@ import type {
   ProductSearchParams,
   PaginatedResponse,
 } from '../types';
+import { processQuery } from '../utils/query-transformer';
+import { ProductQueryBuilder, type Queryable } from '../utils/query-builders';
+import {
+  PRODUCT_FIELD_TYPES,
+  QUERY_CONTEXT,
+  type ProductQueryParams,
+  type ProductListResponse,
+} from '../types/resources';
 
 /**
- * Products resource for accessing product information
+ * Products resource for accessing product information.
+ *
+ * Two ways to list:
+ *  - `search(params)` and the convenience helpers — simple param objects.
+ *  - `query(params)` / `createQueryBuilder()` — the typed query system shared
+ *    with @inkress/admin-sdk (range/contains/date filters + status translation).
  */
-export class ProductsResource {
+export class ProductsResource implements Queryable<ProductListResponse> {
   constructor(private client: HttpClient) {}
 
   /**
@@ -20,7 +33,23 @@ export class ProductsResource {
   }
 
   /**
-   * Search products with filters and pagination
+   * Run a typed product query. Transforms range/contains/date filters and
+   * translates contextual `status` strings (e.g. 'published') to API codes.
+   *
+   * @example await products.query({ status: 'published', price: { min: 20 }, page: 1 })
+   */
+  async query(params?: ProductQueryParams): Promise<ApiResponse<ProductListResponse>> {
+    const processed = processQuery(params || {}, PRODUCT_FIELD_TYPES, { context: QUERY_CONTEXT.product });
+    return this.client.get<ProductListResponse>('/products', processed);
+  }
+
+  /** Start a fluent product query, e.g. `products.createQueryBuilder().whereStatus('published').execute()`. */
+  createQueryBuilder(initialQuery?: ProductQueryParams): ProductQueryBuilder {
+    return new ProductQueryBuilder(this, initialQuery);
+  }
+
+  /**
+   * Search products with filters and pagination (simple param object).
    */
   async search(params?: ProductSearchParams): Promise<ApiResponse<PaginatedResponse<Product>>> {
     return this.client.get<PaginatedResponse<Product>>('/products', params);
