@@ -110,11 +110,11 @@ export class ProductsResource implements Queryable<ProductListResponse> {
     limit = 12,
     params?: Omit<ProductSearchParams, 'limit' | 'sort' | 'order'>
   ): Promise<ApiResponse<PaginatedResponse<Product>>> {
-    return this.search({ 
-      ...params, 
-      limit, 
-      sort: 'created_at', 
-      order: 'desc' 
+    return this.search({
+      ...params,
+      limit,
+      sort: 'created_at',
+      order: 'desc'
     });
   }
 }

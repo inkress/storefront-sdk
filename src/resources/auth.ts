@@ -1,3 +1,4 @@
+import { InkressApiError } from '../client';
 import type { HttpClient } from '../client';
 import type {
   ApiResponse,
@@ -35,17 +36,32 @@ export class AuthResource {
   }
 
   /**
-   * Validate current token/session
+   * Check whether the current auth token/session is still valid.
+   *
+   * Hits `GET /auth/valid`, which returns an empty `200` body when the session
+   * is valid and `401` when it is not — it does NOT return the customer record.
+   * Resolves `true`/`false` accordingly; non-401 errors (network, 5xx) propagate.
    */
-  async validateToken(): Promise<ApiResponse<Customer>> {
-    return this.client.get<Customer>('/auth/valid', {});
+  async validateToken(): Promise<boolean> {
+    try {
+      await this.client.get<null>('/auth/valid', {});
+      return true;
+    } catch (error) {
+      if (error instanceof InkressApiError && error.status === 401) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   /**
-   * Get current customer profile (alias for validateToken)
+   * Fetch a customer profile by id (`GET /users/:id`).
+   *
+   * `customerId` is the `customer.id` returned by {@link login} / {@link register}.
+   * Subject to the server's authorization rules for the `accounts.user` resource.
    */
-  async getProfile(): Promise<ApiResponse<Customer>> {
-    return this.validateToken();
+  async getProfile(customerId: number): Promise<ApiResponse<Customer>> {
+    return this.client.get<Customer>(`/users/${customerId}`, {});
   }
 
   /**
@@ -66,23 +82,26 @@ export class AuthResource {
   }
 
   /**
-   * Update customer profile (requires authentication)
-   * Note: This would typically be done through a separate users endpoint
+   * Update a customer profile by id (`PUT /users/:id`).
+   *
+   * `customerId` is the `customer.id` from {@link login} / {@link register}.
+   * Subject to the server's authorization rules for the `accounts.user` resource.
    */
-  async updateProfile(updates: Partial<Omit<Customer, 'id' | 'created_at' | 'updated_at'>>): Promise<ApiResponse<Customer>> {
-    // This endpoint may not exist in the current API, you might need to implement it
-    return this.client.put<Customer>('/users/profile', updates);
+  async updateProfile(
+    customerId: number,
+    updates: Partial<Omit<Customer, 'id' | 'created_at' | 'updated_at'>>,
+  ): Promise<ApiResponse<Customer>> {
+    return this.client.put<Customer>(`/users/${customerId}`, updates);
   }
 
   /**
-   * Change customer password (requires authentication)
-   * Note: This would typically be done through a separate users endpoint
+   * Change a customer's password (`PUT /users/:id` with the new password).
+   *
+   * The API sets the password directly and does not verify a current password,
+   * so none is required. `customerId` is the `customer.id` from {@link login} /
+   * {@link register}. Subject to server-side authorization.
    */
-  async changePassword(data: {
-    current_password: string;
-    new_password: string;
-  }): Promise<ApiResponse<{ message: string }>> {
-    // This endpoint may not exist in the current API, you might need to implement it
-    return this.client.put<{ message: string }>('/users/password', data);
+  async changePassword(customerId: number, newPassword: string): Promise<ApiResponse<Customer>> {
+    return this.client.put<Customer>(`/users/${customerId}`, { password: newPassword });
   }
 }

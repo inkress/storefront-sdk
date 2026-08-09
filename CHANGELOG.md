@@ -5,6 +5,56 @@ All notable changes to the Inkress Storefront SDK will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-08-09
+
+Correctness release. Several methods pointed at endpoints that do not exist in the
+Commerce API; they were verified against the API router/controllers and the
+`commerce-web` client, then fixed. Some public signatures changed as a result —
+but only on methods that never worked against a real endpoint, so this ships as a
+patch.
+
+### Fixed
+- **Wishlist remote sync** posted/read `/generis` (a typo). It now persists
+  through the real `/generics` key-value store via `GenericsResource`
+  (`getByKey` / `createOrUpdate`), which also fixes fragile `data`/`result`
+  response handling.
+- **`files.upload()`** posted to `/files/upload`, which does not exist. It now
+  posts to `/files/pubload` (the real endpoint, as used by `commerce-web`). The
+  redundant manual `Content-Type: multipart/form-data` header was removed (the
+  client sets the multipart boundary itself).
+- **`files.uploadFromUrl()`** posted to a non-existent `/files/upload-url`. There
+  is no server-side upload-by-URL endpoint, so it now fetches the resource
+  client-side and uploads the bytes through `/files/pubload`.
+- **`auth.getProfile()`** aliased `/auth/valid`, which returns an empty body (a
+  session check, not a profile). It now fetches `GET /users/:id`.
+
+### Changed (breaking)
+- **`auth.getProfile(customerId)`** now requires the customer id (from
+  `login`/`register`) and hits `GET /users/:id`.
+- **`auth.updateProfile(customerId, updates)`** now takes the id and hits
+  `PUT /users/:id` (was the non-existent `/users/profile`).
+- **`auth.changePassword(customerId, newPassword)`** now takes the id and hits
+  `PUT /users/:id`; it no longer requires a `current_password` (the API does not
+  verify one).
+- **`auth.validateToken()`** now resolves `boolean` (`true` on 200, `false` on
+  401) instead of an `ApiResponse<Customer>` — `/auth/valid` never returned a
+  customer.
+
+### Removed (breaking)
+- The fabricated convenience methods on `sdk.generic` — `syncCart`,
+  `syncWishlist`, `getServerCart`, `getServerWishlist`, `sendContactMessage`,
+  `subscribeNewsletter`, `trackEvent`, `getShippingRates`, `applyCoupon` — all
+  targeted endpoints that do not exist. `sdk.generic` remains as a raw
+  request escape hatch (`get`/`post`/`put`/`delete`); use `sdk.generics` for the
+  typed `/generics` store.
+
+### Housekeeping
+- Removed dead orphan type stubs under `src/types/` and two empty `src/lib/`
+  files.
+- Added a GitHub Actions CI workflow (lint + type-check + test + build on 18/20).
+- Moved internal dev notes from the repo root into `docs/notes/`.
+- Documented privilege levels (public / customer / merchant-admin) in the README.
+
 ## [1.1.0] - 2026-06-15
 
 A major capability release that brings the storefront SDK to architectural parity

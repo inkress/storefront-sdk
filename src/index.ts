@@ -184,10 +184,11 @@ export class InkressStorefrontSDK {
     this.generic = new GenericResource(this.client);
     this.generics = new GenericsResource(this.client);
 
+    // Wishlist persists remotely through the typed `/generics` store.
     this.wishlist = new WishlistResource(
       this.storageManager.createStorage('wishlist'),
       this.eventEmitter,
-      this.generic
+      this.generics
     );
   }
 

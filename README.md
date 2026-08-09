@@ -74,6 +74,19 @@ interface StorefrontConfig {
 - **Optional customer `authToken`** (Bearer) unlocks customer-scoped actions: their orders, profile, posting reviews, wishlist sync.
 - **No secrets, no card data.** This is the public storefront surface. Checkout initiates via a public order token or a hosted payment frame; settlement and the strict 3DS gate live server-side. Keep the auth token in memory (the default) — avoid persisting bearer tokens to `localStorage`.
 
+#### Privilege levels
+
+This SDK covers both storefront (shopper) and store-management operations. The
+write methods below hit the same API but require a **merchant/admin-privileged**
+token — a shopper's `authToken` will be rejected by the server. They are included
+so you can build a merchant's own storefront/admin, not for untrusted clients:
+
+| Requires | Methods |
+| --- | --- |
+| Public (Client-Id only) | `merchants.*`, `products.*`, `categories` reads, `reviews` reads, `shipping` reads, `checkout.*`, `files.upload`, local `cart.*` |
+| Customer (Bearer) | `auth.getProfile/updateProfile/changePassword`, `orders.list/create`, `reviews.create`, `wishlist` remote sync |
+| Merchant/admin (privileged Bearer) | `categories.create/update/delete`, `shipping.create*/update*/delete*`, `files.update/delete`, `generics.create/update/delete` |
+
 ```typescript
 const sdk = InkressStorefrontSDK.forMerchantWithAuth('acme', customerJwt);
 // or with auth only (no merchant): InkressStorefrontSDK.withAuth(customerJwt)
@@ -149,7 +162,18 @@ const thumb = sdk.files.getOptimizedUrl(uploaded.result.file, 800, 600);
 ```typescript
 const { result } = await sdk.auth.login({ email, password });
 sdk.setAuthToken(result!.token);
+
+const customerId = result!.customer.id;
+await sdk.auth.getProfile(customerId);                         // GET /users/:id
+await sdk.auth.updateProfile(customerId, { first_name: 'Jane' }); // PUT /users/:id
+await sdk.auth.changePassword(customerId, 'new-password');     // PUT /users/:id
+
+// Session check — resolves true/false (does NOT return the profile):
+const stillValid = await sdk.auth.validateToken();
 ```
+
+Profile read/update and password change target `/users/:id` (the id comes from
+`login`/`register`) and are subject to the server's authorization rules.
 
 ## Cart
 

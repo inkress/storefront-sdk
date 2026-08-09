@@ -489,7 +489,7 @@ export interface ShippingMethodsParams extends PaginationParams {
 
 // Note: Query parameter capabilities based on filters.ex analysis:
 // - Range filters: field_min, field_max
-// - Array filters: field_in (comma-separated values)  
+// - Array filters: field_in (comma-separated values)
 // - Substring filters: contains.field (searches within text fields)
 // - Date filters: before.field, after.field, on.field
 // - JSON field queries: Complex nested filtering on JSON fields
