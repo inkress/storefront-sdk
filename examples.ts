@@ -134,10 +134,11 @@ async function handleAuth() {
       password: 'password123'
     });
     
-    console.log('Logged in:', response.data?.customer);
+    const customer = response.result?.customer;
+    console.log('Logged in:', customer);
 
-    // Update profile
-    await sdk.auth.updateProfile({
+    // Update profile (uses the customer id returned by login/register)
+    await sdk.auth.updateProfile(customer!.id, {
       first_name: 'Jane',
       last_name: 'Doe',
       phone: '+1234567890'

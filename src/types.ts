@@ -69,6 +69,12 @@ export interface Product {
   tag_ids: number[];
   data?: Record<string, any>;
   meta?: Record<string, any>;
+  /**
+   * Variant/option/attribute fields as the merchant form's *write* payload.
+   * On read, the API serves these under `data.attributes` + `data.customer_inputs`
+   * (what the marketplace consumes); use `products.getCustomFields(product)`.
+   */
+  custom_fields?: ProductCustomField[];
   currency: Currency;
   category_id?: number | null;
   category?: Category;
@@ -489,10 +495,147 @@ export interface ShippingMethodsParams extends PaginationParams {
 
 // Note: Query parameter capabilities based on filters.ex analysis:
 // - Range filters: field_min, field_max
-// - Array filters: field_in (comma-separated values)  
+// - Array filters: field_in (comma-separated values)
 // - Substring filters: contains.field (searches within text fields)
 // - Date filters: before.field, after.field, on.field
 // - JSON field queries: Complex nested filtering on JSON fields
 // - Exclusion: exclude parameter
 // - Exact match: Direct field name equals value
 // - Ordering: "field_name direction" format (e.g., "created_at desc")
+
+// ---------------------------------------------------------------------------
+// Addresses (saved customer addresses — `/addresses` resource)
+// ---------------------------------------------------------------------------
+
+/**
+ * A persisted address record from the `/addresses` resource. (Distinct from the
+ * loose {@link Address} value object used inline in order/checkout payloads.)
+ * The owner is polymorphic via `kind` (owner type) + `kind_id` (owner id) — for
+ * a storefront customer, `kind_id` is their customer id.
+ */
+export interface SavedAddress {
+  id: number;
+  hash?: string;
+  kind: number;
+  kind_id: number;
+  street: string;
+  street_optional?: string;
+  city: string;
+  state: string;
+  country: string;
+  region?: string;
+  town?: string;
+  postal_code?: string;
+  lat?: number;
+  /** Longitude (the API field is misnamed `lang`). */
+  lang?: number;
+  inserted_at?: string;
+  updated_at?: string;
+}
+
+export interface AddressInput {
+  kind: number;
+  kind_id: number;
+  street: string;
+  street_optional?: string;
+  city: string;
+  state: string;
+  country: string;
+  region?: string;
+  town?: string;
+  postal_code?: string;
+  lat?: number;
+  lang?: number;
+}
+
+export interface AddressListParams extends PaginationParams {
+  kind?: number;
+  kind_id?: number;
+  country?: string;
+  [key: string]: any;
+}
+
+// ---------------------------------------------------------------------------
+// Product custom fields (variants / options / attributes)
+// ---------------------------------------------------------------------------
+
+export type ProductCustomFieldType = 'text' | 'number' | 'options' | 'image' | 'file';
+
+export interface ProductCustomFieldOption {
+  label: string;
+  price: number;
+}
+
+/**
+ * A product custom field as authored in the merchant product form and stored in
+ * `product.data`. `type: 'options'` carries a list of `{ label, price }`
+ * choices; other types carry a single add-on `price` charged when filled.
+ */
+export interface ProductCustomField {
+  name: string;
+  type: ProductCustomFieldType;
+  value?: string;
+  price?: number;
+  options?: ProductCustomFieldOption[];
+}
+
+/**
+ * A customer's selection for one custom field, used by unit-price calculation.
+ * For `type: 'options'` set `option` to the chosen option's label; for other
+ * input types set `filled: true` when the customer provided a value (which
+ * triggers the field's add-on `price`).
+ */
+export interface CustomFieldSelection {
+  name: string;
+  option?: string;
+  filled?: boolean;
+}
+
+/** A fresh stock snapshot for a product. */
+export interface ProductStock {
+  inStock: boolean;
+  unlimited: boolean;
+  /** `null` when the product is unlimited. */
+  unitsRemaining: number | null;
+}
+
+// ---------------------------------------------------------------------------
+// Faceted search (server-side `group_by` on `/products`)
+// ---------------------------------------------------------------------------
+
+export type ProductGroupByField =
+  | 'category_id'
+  | 'currency_id'
+  | 'status'
+  | 'public'
+  | 'unlimited';
+
+/** Product fields the API allows `group_by` faceting on (see product.ex). */
+export const PRODUCT_GROUP_BY_FIELDS: ProductGroupByField[] = [
+  'category_id',
+  'currency_id',
+  'status',
+  'public',
+  'unlimited',
+];
+
+/** One row of a faceted (`group_by`) product query. */
+export interface FacetBucket {
+  /** The group-by field this bucket is keyed on (the first requested field). */
+  field: ProductGroupByField;
+  /** The distinct value of `field` for this bucket. */
+  value: string | number | boolean | null;
+  /** Number of products in the bucket (the `id` count aggregate). */
+  count: number;
+  priceMin?: number;
+  priceMax?: number;
+  priceAvg?: number;
+  unitsRemainingSum?: number;
+  /** All aggregate/group columns exactly as returned by the API. */
+  raw: Record<string, any>;
+}
+
+export interface ProductFacetsOptions {
+  /** One or more whitelisted group-by fields (see {@link PRODUCT_GROUP_BY_FIELDS}). */
+  groupBy: ProductGroupByField | ProductGroupByField[];
+}

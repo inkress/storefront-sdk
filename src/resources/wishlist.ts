@@ -1,12 +1,10 @@
 import type { BrowserStorage } from '../storage';
 import type { EventEmitter } from '../events';
-import type { GenericResource } from './generic';
+import type { GenericsResource } from './generics';
 import type {
   Wishlist,
   WishlistItem,
   Product,
-  Generic,
-  GenericInput,
 } from '../types';
 
 /**
@@ -15,19 +13,19 @@ import type {
 export class WishlistResource {
   private storage: BrowserStorage<Wishlist>;
   private eventEmitter: EventEmitter;
-  private generic: GenericResource;
+  private generics: GenericsResource;
   private readonly wishlistKind = 2; // Kind identifier for wishlist data
   private userId?: number;
 
   constructor(
-    storage: BrowserStorage<Wishlist>, 
+    storage: BrowserStorage<Wishlist>,
     eventEmitter: EventEmitter,
-    generic: GenericResource,
+    generics: GenericsResource,
     userId?: number
   ) {
     this.storage = storage;
     this.eventEmitter = eventEmitter;
-    this.generic = generic;
+    this.generics = generics;
     this.userId = userId;
   }
 
@@ -335,7 +333,7 @@ export class WishlistResource {
   }
 
   /**
-   * Get remote wishlist from generic storage
+   * Get remote wishlist from the `/generics` key-value store.
    */
   private async getRemoteWishlist(): Promise<Wishlist | null> {
     if (!this.userId) {
@@ -343,17 +341,10 @@ export class WishlistResource {
     }
 
     try {
-      const response = await this.generic.get<Generic[]>(
-        '/generis',
-        {
-          key: `wishlist_${this.userId}`,
-          kind: this.wishlistKind,
-          limit: 1
-        }
-      );
+      const response = await this.generics.getByKey(`wishlist_${this.userId}`);
 
-      if (response.state === 'ok' && response.result && response.data.length > 0) {
-        return response.data[0].data as Wishlist;
+      if (response.state === 'ok' && response.result) {
+        return response.result.data as Wishlist;
       }
     } catch (error) {
       console.warn('Failed to fetch remote wishlist:', error);
@@ -363,7 +354,7 @@ export class WishlistResource {
   }
 
   /**
-   * Save wishlist to remote storage
+   * Save wishlist to the `/generics` key-value store (upsert by key).
    */
   private async saveToRemote(wishlist: Wishlist): Promise<void> {
     if (!this.userId) {
@@ -371,13 +362,11 @@ export class WishlistResource {
     }
 
     try {
-      const wishlistData: GenericInput = {
-        key: `wishlist_${this.userId}`,
-        kind: this.wishlistKind,
-        data: wishlist
-      };
-
-      await this.generic.post('/generis', wishlistData);
+      await this.generics.createOrUpdate(
+        `wishlist_${this.userId}`,
+        this.wishlistKind,
+        wishlist as unknown as Record<string, any>
+      );
     } catch (error) {
       console.warn('Failed to save wishlist to remote:', error);
     }

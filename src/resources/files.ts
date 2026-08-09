@@ -1,3 +1,5 @@
+import fetch from 'cross-fetch';
+import { InkressApiError } from '../client';
 import type { HttpClient } from '../client';
 import type {
   ApiResponse,
@@ -138,25 +140,30 @@ export class FilesResource {
       if (options.use_filename !== undefined) formData.append('use_filename', String(options.use_filename));
     }
 
-    return this.client.post<FileUploadResponse>('/files/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    // The client strips Content-Type for FormData bodies so fetch can set the
+    // multipart boundary itself — do not set it here.
+    return this.client.post<FileUploadResponse>('/files/pubload', formData);
   }
 
   /**
-   * Upload file from URL
-   * 
-   * @param url - The URL of the file to upload
+   * Upload a file from a URL.
+   *
+   * There is no server-side "upload by URL" endpoint, so this fetches the
+   * resource client-side and uploads the bytes through the same `/files/pubload`
+   * path as {@link upload}.
+   *
+   * @param url - The URL of the file to fetch and upload
    * @param options - Upload options
    * @returns Promise resolving to the uploaded file details
    */
   async uploadFromUrl(url: string, options?: FileUploadOptions): Promise<ApiResponse<FileUploadResponse>> {
-    return this.client.post<FileUploadResponse>('/files/upload-url', {
-      url,
-      ...options,
-    });
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new InkressApiError(`Failed to fetch file from URL (HTTP ${response.status})`, response.status);
+    }
+    const blob = await response.blob();
+    const filename = options?.filename || url.split('/').pop()?.split('?')[0] || 'upload';
+    return this.upload(blob, { ...options, filename });
   }
 
   /**
