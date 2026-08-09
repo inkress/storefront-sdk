@@ -5,6 +5,42 @@ All notable changes to the Inkress Storefront SDK will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-08-09
+
+Storefront capability release (additive). Every shape is grounded in the Commerce
+API + `commerce-web` product form — see
+`docs/superpowers/specs/2026-08-09-storefront-sdk-addresses-variants-stock-facets-design.md`.
+
+### Added
+- **Saved addresses** — new `sdk.addresses` (`AddressesResource`) over the real
+  `/addresses` resource: `list`, `get`, `create`, `update`, `delete`, and
+  `listForCustomer(customerId)` (scopes by `kind_id`). New `SavedAddress` /
+  `AddressInput` / `AddressListParams` types.
+- **Product variants / options** — the merchant product form's `custom_fields`
+  are now first-class on the storefront:
+  - `products.getCustomFields(product)` reads them defensively (top-level
+    `custom_fields`, `data.custom_fields`, or legacy `data.attributes` +
+    `data.customer_inputs`).
+  - `products.getAttributes` / `getCustomerInputs` mirror the form's split.
+  - `products.computeUnitPrice(product, selections)` = base price + chosen option
+    prices + add-on prices for filled inputs.
+  - New `ProductCustomField`, `ProductCustomFieldOption`, `CustomFieldSelection`
+    types, plus tree-shakeable `getProduct*` / `computeProductUnitPrice` utils.
+- **Stock** — `products.isInStock(product)`, `products.getAvailableStock(product)`
+  (`null` when unlimited), and `products.checkStock(productId)` for a fresh
+  snapshot before checkout. New `ProductStock` type.
+- **Faceted search** — `products.facets(filters, { groupBy })` uses the API's
+  server-side `group_by` to return per-group counts + price/stock aggregates in
+  one request. Group fields are whitelisted (`PRODUCT_GROUP_BY_FIELDS`:
+  `category_id`, `currency_id`, `status`, `public`, `unlimited`). New
+  `FacetBucket` / `ProductFacetsOptions` types.
+
+### Note
+- Custom fields are read the same way `commerce-web`'s marketplace reads them —
+  the canonical shape `product.data.attributes` + `product.data.customer_inputs`
+  — with the merchant form's `custom_fields` write payload kept as a fallback.
+  `computeUnitPrice` mirrors the marketplace's own option-price logic.
+
 ## [1.1.1] - 2026-08-09
 
 Correctness release. Several methods pointed at endpoints that do not exist in the

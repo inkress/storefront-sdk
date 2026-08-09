@@ -16,6 +16,7 @@ import { ReviewsResource } from './resources/reviews';
 import { ShippingResource } from './resources/shipping';
 import { FilesResource } from './resources/files';
 import { CheckoutResource } from './resources/checkout';
+import { AddressesResource } from './resources/addresses';
 
 export * from './types/checkout';
 export { CheckoutResource } from './resources/checkout';
@@ -61,6 +62,19 @@ export {
   ReviewQueryBuilder,
   type Queryable,
 } from './utils/query-builders';
+
+// Product custom-field / stock / facet helpers (pure — usable without an SDK instance).
+export {
+  getProductCustomFields,
+  getProductAttributes,
+  getProductCustomerInputs,
+  computeProductUnitPrice,
+  isProductInStock,
+  getProductAvailableStock,
+  toProductStock,
+  normalizeFacetRow,
+} from './utils/variants';
+export { AddressesResource } from './resources/addresses';
 
 /**
  * Main Inkress Storefront SDK class
@@ -152,6 +166,7 @@ export class InkressStorefrontSDK {
   public readonly shipping: ShippingResource;
   public readonly files: FilesResource;
   public readonly checkout: CheckoutResource;
+  public readonly addresses: AddressesResource;
 
   constructor(config: StorefrontConfig = {}) {
     // Initialize core components
@@ -171,6 +186,7 @@ export class InkressStorefrontSDK {
     this.shipping = new ShippingResource(this.client);
     this.files = new FilesResource(this.client);
     this.checkout = new CheckoutResource(this.client);
+    this.addresses = new AddressesResource(this.client);
 
     // Initialize cart and wishlist with storage, events, and client
     this.cart = new CartResource(
