@@ -27,6 +27,8 @@ export { processQuery, QueryBuilder, type QueryParams, type RangeQuery, type Str
 export { ProductQueryBuilder, CategoryQueryBuilder, OrderQueryBuilder, ReviewQueryBuilder, type Queryable, } from './utils/query-builders';
 export { getProductCustomFields, getProductAttributes, getProductCustomerInputs, computeProductUnitPrice, isProductInStock, getProductAvailableStock, toProductStock, normalizeFacetRow, } from './utils/variants';
 export { AddressesResource } from './resources/addresses';
+export { mountStorefront } from './dom';
+export type { StorefrontDomOptions, StorefrontDomHandle, StorefrontCartApi, CartAddInput, FleekLine, HookFields, IkCartDetail, } from './dom';
 /**
  * Main Inkress Storefront SDK class
  *

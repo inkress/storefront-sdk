@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en" data-currency="USD">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inkress Storefront Kit — demo</title>
+<style>
+  :root {
+    --ink: #0f172a; --slate: #475569; --line: #e2e8f0; --bg: #f8fafc;
+    --accent: #4f46e5; --accent-ink: #fff; --ok: #0d9488;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 -apple-system, system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+  header { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px; background: #fff; border-bottom: 1px solid var(--line); }
+  header b { font-size: 15px; letter-spacing: .02em; }
+  .bag { position: relative; border: 1px solid var(--line); background: #fff; border-radius: 10px;
+    padding: 8px 14px; cursor: pointer; font: inherit; }
+  .bag [data-ik-cart-count] { display: inline-grid; place-items: center; min-width: 20px; height: 20px;
+    margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12px; }
+  main { max-width: 860px; margin: 28px auto; padding: 0 20px; display: grid; gap: 22px; grid-template-columns: 1fr 1fr; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .card h2 { margin: 0 0 2px; font-size: 17px; }
+  .card .tag { font-size: 12px; color: var(--slate); }
+  .thumb { height: 120px; border-radius: 10px; margin: 12px 0; background: linear-gradient(135deg, #c7d2fe, #99f6e4); }
+  .thumb.b { background: linear-gradient(135deg, #fbcfe8, #bfdbfe); }
+  .price { font-weight: 600; }
+  .stepper { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin: 10px 0; }
+  .stepper button { border: 0; background: #f1f5f9; width: 30px; height: 32px; font-size: 16px; cursor: pointer; }
+  .stepper input { border: 0; width: 42px; height: 32px; text-align: center; font: inherit; }
+  .add { width: 100%; border: 0; background: var(--ink); color: #fff; padding: 11px; border-radius: 9px; font: inherit; cursor: pointer; }
+  .add:hover { background: #1e293b; }
+
+  /* cart drawer + lines (the kit renders .fk-cline markup) */
+  [data-ik-drawer] { position: fixed; inset: 0 0 0 auto; width: min(400px, 92vw); background: #fff;
+    border-left: 1px solid var(--line); box-shadow: -20px 0 50px rgba(15,23,42,.12); transform: translateX(100%);
+    transition: transform .24s ease; display: flex; flex-direction: column; z-index: 40; }
+  [data-ik-drawer].is-open { transform: none; }
+  .drawer__head { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+  .drawer__head button { border: 0; background: none; font-size: 22px; cursor: pointer; color: var(--slate); }
+  [data-ik-cart-lines] { list-style: none; margin: 0; padding: 8px 18px; overflow: auto; flex: 1; }
+  .fk-cline { display: grid; grid-template-columns: 52px 1fr auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .fk-cline__img { width: 52px; height: 52px; border-radius: 8px; object-fit: cover; background: #eef2ff; }
+  .fk-cline__title { margin: 0 0 6px; font-size: 14px; }
+  .fk-cline__title a { color: inherit; text-decoration: none; }
+  .fk-cline .fk-stepper { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .fk-cline .fk-stepper__btn { border: 0; background: #f1f5f9; width: 26px; height: 28px; cursor: pointer; }
+  .fk-cline .fk-stepper__input { border: 0; width: 36px; text-align: center; font: inherit; }
+  .fk-cline__side { text-align: right; }
+  .fk-cline__price { margin: 0 0 6px; font-weight: 600; }
+  .fk-cline__remove { border: 0; background: none; color: var(--slate); font-size: 12px; cursor: pointer; text-decoration: underline; }
+  .fk-cart__empty { color: var(--slate); text-align: center; padding: 30px 0; list-style: none; }
+  .drawer__foot { padding: 16px 18px; border-top: 1px solid var(--line); }
+  .drawer__foot .row { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 12px; }
+  .checkout { width: 100%; border: 0; background: var(--accent); color: #fff; padding: 12px; border-radius: 9px; font: inherit; cursor: pointer; }
+
+  .log { grid-column: 1 / -1; background: #0f172a; color: #a5b4fc; border-radius: 12px; padding: 14px 16px; font: 12px/1.6 ui-monospace, monospace; min-height: 60px; }
+  .log b { color: #67e8f9; }
+</style>
+</head>
+<body>
+  <header>
+    <b>ISLAND VIBES</b>
+    <button class="bag" data-ik-drawer-open>Bag <span data-ik-cart-count hidden>0</span></button>
+  </header>
+
+  <main>
+    <!-- Product A — native ik-* hooks -->
+    <section class="card" data-ik-buy>
+      <h2>Reef Runner Tee</h2>
+      <span class="tag">authored with <code>data-ik-*</code></span>
+      <div class="thumb"></div>
+      <p class="price">$24.00 · <span style="color:var(--slate)">7 in stock</span></p>
+      <div class="stepper">
+        <button data-ik-buy-dec aria-label="less">&minus;</button>
+        <input data-ik-buy-qty value="1" max="7" inputmode="numeric">
+        <button data-ik-buy-inc aria-label="more">+</button>
+      </div>
+      <button class="add" data-ik-add
+        data-variant-id="101" data-post-id="101" data-title="Reef Runner Tee"
+        data-price="24.00" data-href="/products/reef-runner-tee"
+        data-image="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='52' height='52'%3E%3Crect width='52' height='52' fill='%23c7d2fe'/%3E%3C/svg%3E"
+        data-stock="7" data-unlimited="0">Add to bag</button>
+    </section>
+
+    <!-- Product B — legacy fk-* hooks (fallback path) -->
+    <section class="card" data-fk-buy>
+      <h2>Harbour Cap</h2>
+      <span class="tag">authored with legacy <code>data-fk-*</code></span>
+      <div class="thumb b"></div>
+      <p class="price">$18.50 · <span style="color:var(--slate)">unlimited</span></p>
+      <div class="stepper">
+        <button data-fk-buy-dec aria-label="less">&minus;</button>
+        <input data-fk-buy-qty value="1" inputmode="numeric">
+        <button data-fk-buy-inc aria-label="more">+</button>
+      </div>
+      <button class="add" data-fk-add
+        data-variant-id="202" data-post-id="202" data-title="Harbour Cap"
+        data-price="18.50" data-href="/products/harbour-cap"
+        data-image="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='52' height='52'%3E%3Crect width='52' height='52' fill='%23fbcfe8'/%3E%3C/svg%3E"
+        data-unlimited="1">Add to bag</button>
+    </section>
+
+    <div class="log" id="log"><b>ik:cart</b> events appear here…</div>
+  </main>
+
+  <aside data-ik-drawer hidden>
+    <div class="drawer__head"><strong>Your bag</strong><button data-ik-drawer-close aria-label="Close">&times;</button></div>
+    <ul data-ik-cart-lines></ul>
+    <div class="drawer__foot">
+      <div class="row"><span>Subtotal</span><span data-ik-cart-total>$0.00</span></div>
+      <div data-ik-cart-empty><em style="color:var(--slate)">Add something to get started.</em></div>
+      <button class="checkout" data-ik-cart-filled hidden>Checkout</button>
+    </div>
+  </aside>
+
+  <!-- one script; it reads config off <html>, news up the SDK, and mounts -->
+  <script src="../dist/inkress-storefront.kit.js"></script>
+  <script>
+    var log = document.getElementById('log');
+    document.addEventListener('ik:cart', function (e) {
+      var d = e.detail;
+      log.innerHTML = '<b>ik:cart</b> · ' + d.type + ' · count=' + d.count +
+        ' · subtotal=' + window.inkressCart.money(d.subtotal) +
+        ' · lines=' + d.lines.map(function (l) { return l.title + '×' + l.quantity; }).join(', ');
+    });
+  </script>
+</body>
+</html>

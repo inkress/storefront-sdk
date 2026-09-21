@@ -67,6 +67,27 @@ const config = [
       terser(),
     ],
   },
+  // Auto-mount storefront kit (self-executing IIFE, deps bundled + minified).
+  // A theme includes this one script; it reads config off <html> and mounts.
+  {
+    input: 'src/kit.ts',
+    output: {
+      file: 'dist/inkress-storefront.kit.js',
+      format: 'iife',
+      sourcemap: true,
+    },
+    plugins: [
+      resolve({ browser: true, preferBuiltins: false }),
+      commonjs(),
+      typescript({
+        declaration: false,
+        declarationMap: false,
+        rootDir: 'src',
+        exclude: ['**/*.test.ts', '**/__tests__/**'],
+      }),
+      terser(),
+    ],
+  },
 ];
 
 export default config;

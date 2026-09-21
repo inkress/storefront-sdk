@@ -5,6 +5,33 @@ All notable changes to the Inkress Storefront SDK will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Storefront DOM kit (additive) — the SDK gains FleekSite's two declarative
+conventions so themes can drive the existing cart from markup, without a second cart
+model. Opt-in: importing the SDK still touches nothing until `mountStorefront` runs.
+
+### Added
+- **`mountStorefront(sdk, options?)`** — binds delegated `data-*` hooks and bridges the
+  cart emitter to DOM `CustomEvent`s over the existing `inkress.cart`.
+  - **`ik-*` native, `fk-*` fallback** — every attribute is read `data-ik-<x>`, then
+    `data-fk-<x>`, then bare `data-<x>` (one rule for hooks and data payload alike), so
+    new Inkress themes author `ik-*` while ported FleekSite themes keep working untouched.
+  - **DOM events** — `ik:cart` (+ granular `ik:cart:item:added` …) and, for compat,
+    `fk:cart` with the FleekSite-shaped detail.
+  - **Hooks covered (cart money-path):** `add`/`buynow`, `buy` box + `buy-qty`/`buy-inc`/
+    `buy-dec`, `variant` select (`buy-price`/`buy-stock`), line `inc`/`dec`/`qty`/`remove`,
+    `cart-count`/`cart-total`/`cart-lines`/`cart-empty`/`cart-filled`, `drawer`(+`-open`/
+    `-close`/`-scrim`), `checkout`(+`-status`) → `cart.checkout()` → redirect.
+  - Stock is clamped through the Product's own `unlimited`/`units_remaining`.
+- **`window.inkressCart`** imperative surface (`read/add/setQty/remove/clear/count/
+  subtotal/money/open/close`); aliased to `window.fkCart` for legacy theme code.
+- **`dist/inkress-storefront.kit.js`** — self-executing IIFE build; a theme includes one
+  script that reads `data-ik-merchant`/`data-ik-mode`/`data-currency` off `<html>`,
+  constructs the SDK, and mounts (exposes `window.inkress`).
+- New types: `StorefrontDomOptions`, `StorefrontDomHandle`, `StorefrontCartApi`,
+  `CartAddInput`, `FleekLine`, `HookFields`, `IkCartDetail`.
+
 ## [1.2.0] - 2026-09-20
 
 Order-first checkout money path (additive) — the discount-preserving, 3DS-hardened

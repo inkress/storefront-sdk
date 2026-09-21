@@ -76,6 +76,20 @@ export {
 } from './utils/variants';
 export { AddressesResource } from './resources/addresses';
 
+// Storefront DOM kit — the opt-in `data-ik-*` / `data-fk-*` hooks + `ik:cart` /
+// `fk:cart` DOM events over the existing cart. Importing the SDK does not touch the
+// DOM; nothing runs until `mountStorefront` is called.
+export { mountStorefront } from './dom';
+export type {
+  StorefrontDomOptions,
+  StorefrontDomHandle,
+  StorefrontCartApi,
+  CartAddInput,
+  FleekLine,
+  HookFields,
+  IkCartDetail,
+} from './dom';
+
 /**
  * Main Inkress Storefront SDK class
  * 

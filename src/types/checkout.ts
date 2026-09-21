@@ -183,7 +183,16 @@ export interface FeesQuote {
   [key: string]: unknown;
 }
 
-/** Why a discount code was refused — the machine-readable `reason` slug (Service.Discount). */
+/**
+ * Why a discount code was refused — the machine-readable `reason` slug (Service.Discount).
+ *
+ * Currency handling: a fixed-amount code priced in another currency is CONVERTED to the
+ * order currency (e.g. a J$500 code applies as US$3.125 on a USD order) rather than
+ * refused, and percentage codes are currency-agnostic — so a code's currency differing
+ * from the order's is never on its own a rejection. `currency_mismatch` fires ONLY when
+ * there is no exchange rate for the pair (an unsupported currency). The quote/order
+ * responses are unchanged; `discount_total` simply reflects the converted amount.
+ */
 export type DiscountRejectReason =
   | 'not_found'
   | 'inactive'
@@ -191,6 +200,7 @@ export type DiscountRejectReason =
   | 'usage_limit_reached'
   | 'per_customer_limit_reached'
   | 'not_valid_for_items'
+  /** No exchange rate for the code's currency ↔ the order currency (unsupported pair). */
   | 'currency_mismatch'
   | 'min_spend_not_met';
 

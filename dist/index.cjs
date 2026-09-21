@@ -4157,6 +4157,665 @@ class AddressesResource {
 }
 
 /**
+ * Money formatting for the DOM kit.
+ *
+ * The SDK is major-unit throughout (a $4.30 product has `price === 4.3`), matching
+ * the catalogue adapter and the FleekSite kit. We format via `Intl.NumberFormat`,
+ * doing the multiply in integer minor units so `0.1 + 0.2` never reaches a customer,
+ * then converting back to major for display.
+ */
+/** Major units → integer minor units (cents). */
+function toMinor(major) {
+    return Math.round(Number(major || 0) * 100);
+}
+/** Integer minor units → major units. */
+function toMajor(minor) {
+    return minor / 100;
+}
+/**
+ * Format a major-unit amount as currency. Falls back to `CODE 0.00` when the
+ * runtime lacks `Intl` support for the currency/locale.
+ */
+function money(amountMajor, currency = 'USD', locale = 'en') {
+    const minor = toMinor(amountMajor);
+    try {
+        return new Intl.NumberFormat(locale || 'en', {
+            style: 'currency',
+            currency: currency || 'USD',
+        }).format(toMajor(minor));
+    }
+    catch (_e) {
+        return `${currency || 'USD'} ${toMajor(minor).toFixed(2)}`;
+    }
+}
+
+/**
+ * Build a minimal-but-valid SDK `Product` from flat DOM fields. In V1 the product
+ * *is* the buyable unit, so `variant-id` is the product id. Display-only extras that
+ * `Product` has no first-class field for (`post_id`, `variant_name`) are stashed in
+ * `meta`, where {@link toLine} reads them back. This function is the one sanctioned
+ * DOM→domain cast in the kit.
+ */
+function productFromHook(fields, currencyCode = 'USD') {
+    const id = Number(fields.variantId);
+    const unlimited = fields.unlimited === '1' || fields.unlimited === 'true';
+    const stock = fields.stock == null || fields.stock === '' ? null : Number(fields.stock);
+    const now = new Date().toISOString();
+    const product = {
+        id,
+        title: fields.title || '',
+        price: Number(fields.price || 0),
+        permalink: fields.href || '',
+        image: fields.image || null,
+        status: 1,
+        public: true,
+        unlimited,
+        units_remaining: unlimited ? null : stock,
+        tag_ids: [],
+        currency: { id: 0, code: currencyCode, symbol: '', name: currencyCode },
+        meta: {
+            post_id: fields.postId != null && fields.postId !== '' ? Number(fields.postId) : id,
+            variant_name: fields.variantName || '',
+        },
+        created_at: now,
+        updated_at: now,
+        // merchant is required by the Product type but never read by the cart at
+        // runtime; the DOM has no merchant data, so it is left minimal.
+        merchant: {},
+    };
+    // Single sanctioned cast at the untyped DOM edge (see file header).
+    return product;
+}
+/** Project a stored cart item back to the flat FleekSite line shape. */
+function toLine(item) {
+    var _a;
+    const p = item.product;
+    const meta = (p.meta || {});
+    const max = p.unlimited ? null : (_a = p.units_remaining) !== null && _a !== void 0 ? _a : null;
+    return {
+        variant_id: p.id,
+        post_id: typeof meta.post_id === 'number' ? meta.post_id : p.id,
+        title: p.title,
+        variant_name: typeof meta.variant_name === 'string' ? meta.variant_name : '',
+        image: p.image || '',
+        href: p.permalink || '',
+        price: item.price,
+        max,
+        quantity: item.quantity,
+        total: item.price * item.quantity,
+    };
+}
+
+/** The cart emitter events the DOM bridge mirrors. */
+const CART_EVENTS = [
+    'cart:item:added',
+    'cart:item:removed',
+    'cart:item:updated',
+    'cart:cleared',
+];
+function summarise(cart, type) {
+    return {
+        type,
+        cart,
+        lines: cart.items.map(toLine),
+        count: cart.items.reduce((n, i) => n + i.quantity, 0),
+        subtotal: cart.subtotal,
+    };
+}
+/**
+ * Wire the emitter→DOM bridge. Returns an unbind function that removes every
+ * subscription.
+ */
+function bindCartEvents(sdk, options) {
+    const { target, emitLegacy, onChange } = options;
+    const unsubs = [];
+    for (const name of CART_EVENTS) {
+        const unsub = sdk.on(name, () => {
+            const cart = sdk.cart.get();
+            const detail = summarise(cart, name);
+            if (onChange)
+                onChange(cart);
+            target.dispatchEvent(new CustomEvent('ik:cart', { bubbles: true, detail }));
+            target.dispatchEvent(new CustomEvent(`ik:${name}`, { bubbles: true, detail }));
+            if (emitLegacy) {
+                // FleekSite themes read `event.detail.items`.
+                target.dispatchEvent(new CustomEvent('fk:cart', { bubbles: true, detail: { items: detail.lines } }));
+            }
+        });
+        unsubs.push(unsub);
+    }
+    return () => {
+        unsubs.forEach((fn) => fn());
+        unsubs.length = 0;
+    };
+}
+
+/**
+ * Dual-convention attribute access for the storefront DOM kit.
+ *
+ * Every hook and data attribute is read `ik-*` first, then `fk-*`, then bare
+ * `data-*`. This lets a new Inkress theme author `data-ik-add` / `data-ik-price`
+ * while every ported FleekSite theme (`data-fk-add`, `data-price`) keeps working
+ * with no change. This module is the ONLY place the prefix precedence lives.
+ */
+/** Native prefix used for new markup and dispatched events. */
+const IK = 'ik';
+/** Legacy FleekSite prefix kept for backward compatibility. */
+const FK = 'fk';
+/**
+ * Read a hook/data attribute by its logical (un-prefixed) name, e.g. `'add'`,
+ * `'cart-count'`, `'variant-id'`, `'price'`. Returns the first of
+ * `data-ik-<name>`, `data-fk-<name>`, `data-<name>` that is present, or `null`.
+ */
+function attr(el, name) {
+    if (!el)
+        return null;
+    const ik = el.getAttribute(`data-${IK}-${name}`);
+    if (ik !== null)
+        return ik;
+    const fk = el.getAttribute(`data-${FK}-${name}`);
+    if (fk !== null)
+        return fk;
+    return el.getAttribute(`data-${name}`);
+}
+/** True when the element itself carries the hook under either prefix. */
+function hasHook(el, name) {
+    if (!el)
+        return false;
+    return (el.hasAttribute(`data-${IK}-${name}`) || el.hasAttribute(`data-${FK}-${name}`));
+}
+/** CSS selector matching a behavioural hook under either prefix. */
+function selector(name) {
+    return `[data-${IK}-${name}],[data-${FK}-${name}]`;
+}
+/** Nearest ancestor-or-self carrying the hook (delegated-event helper). */
+function closestHook(el, name) {
+    if (!el)
+        return null;
+    return el.closest(selector(name));
+}
+/** All elements under `root` carrying the hook. */
+function allEls(root, name) {
+    return Array.prototype.slice.call(root.querySelectorAll(selector(name)));
+}
+/** First element under `root` carrying the hook, or `null`. */
+function firstEl(root, name) {
+    return root.querySelector(selector(name));
+}
+/** The value of a hook attribute on a specific element (e.g. `data-ik-remove="42"`). */
+function hookValue(el, name) {
+    return attr(el, name);
+}
+
+/**
+ * Cart mutations expressed against the narrow {@link StorefrontLike} interface.
+ * Shared by the delegated controller and the `window.inkressCart` global so the
+ * stock-clamp rules live in exactly one place.
+ *
+ * Stock ceilings are preserved through the stored Product's own `unlimited` /
+ * `units_remaining`, so there is no separate per-line `max` to keep in sync.
+ */
+/** Add (or top up) a line from flat hook fields, clamped to available stock. */
+function addFromFields(sdk, fields, qtyRaw, currency) {
+    if (!fields.variantId)
+        return;
+    const qty = Math.max(1, parseInt(String(qtyRaw !== null && qtyRaw !== void 0 ? qtyRaw : '1'), 10) || 1);
+    const product = productFromHook(fields, currency);
+    const existing = sdk.cart.getItem(product.id);
+    let target = (existing ? existing.quantity : 0) + qty;
+    if (!product.unlimited && product.units_remaining != null) {
+        target = Math.min(target, product.units_remaining);
+    }
+    if (target < 1)
+        return;
+    if (existing)
+        sdk.cart.updateItemQuantity(existing.id, target);
+    else
+        sdk.cart.addItem(product, target);
+}
+/** Increment a line by one, clamped to available stock. */
+function lineInc(sdk, variantId) {
+    const item = sdk.cart.getItem(Number(variantId));
+    if (!item)
+        return;
+    let q = item.quantity + 1;
+    const p = item.product;
+    if (!p.unlimited && p.units_remaining != null)
+        q = Math.min(q, p.units_remaining);
+    sdk.cart.updateItemQuantity(item.id, q);
+}
+/** Decrement a line by one; removes it at zero (via `updateItemQuantity`). */
+function lineDec(sdk, variantId) {
+    const item = sdk.cart.getItem(Number(variantId));
+    if (!item)
+        return;
+    sdk.cart.updateItemQuantity(item.id, item.quantity - 1);
+}
+/** Set a line's quantity absolutely; a non-positive value removes it. */
+function lineSetQty(sdk, variantId, valueRaw) {
+    const item = sdk.cart.getItem(Number(variantId));
+    if (!item)
+        return;
+    const q = parseInt(String(valueRaw), 10);
+    if (!(q > 0)) {
+        sdk.cart.removeProduct(Number(variantId));
+        return;
+    }
+    const p = item.product;
+    const capped = !p.unlimited && p.units_remaining != null ? Math.min(q, p.units_remaining) : q;
+    sdk.cart.updateItemQuantity(item.id, capped);
+}
+/** Total item count across the cart. */
+function count(sdk) {
+    return sdk.cart.get().items.reduce((n, i) => n + i.quantity, 0);
+}
+/** Cart subtotal in major units. */
+function subtotal(sdk) {
+    return sdk.cart.get().subtotal;
+}
+/** Current cart projected to flat FleekSite lines. */
+function readLines(sdk) {
+    return sdk.cart.get().items.map(toLine);
+}
+
+/**
+ * The cart controller: delegated DOM hooks → the existing `inkress.cart`, plus the
+ * cart view (count / total / lines / empty / filled), the drawer, the buy-box stepper
+ * and variant `<select>`, and the checkout submit. Every attribute is read
+ * `ik-*`-first via {@link ./prefix}, so `data-ik-add` and `data-fk-add` both work.
+ */
+const EMPTY_LINE_HTML = '<li class="fk-cart__empty"><p>Nothing in the bag yet.</p></li>';
+function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => {
+        switch (c) {
+            case '&': return '&amp;';
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '"': return '&quot;';
+            default: return '&#39;';
+        }
+    });
+}
+function readFields(el) {
+    return {
+        variantId: attr(el, 'variant-id'),
+        postId: attr(el, 'post-id'),
+        title: attr(el, 'title'),
+        variantName: attr(el, 'variant-name'),
+        image: attr(el, 'image'),
+        href: attr(el, 'href'),
+        price: attr(el, 'price'),
+        stock: attr(el, 'stock'),
+        unlimited: attr(el, 'unlimited'),
+    };
+}
+function mountCartController(sdk, opts) {
+    const { root, doc, currency, locale } = opts;
+    /* ── view ─────────────────────────────────────────────────────────── */
+    function lineHTML(l) {
+        const id = esc(String(l.variant_id));
+        const img = l.image
+            ? `<img class="fk-cline__img" src="${esc(l.image)}" alt="" loading="lazy">`
+            : '<span class="fk-cline__img fk-cline__img--none" aria-hidden="true"></span>';
+        const titleInner = l.href ? `<a href="${esc(l.href)}">${esc(l.title)}</a>` : esc(l.title);
+        const variant = l.variant_name && l.variant_name !== l.title
+            ? `<p class="fk-cline__variant">${esc(l.variant_name)}</p>`
+            : '';
+        return (`<li class="fk-cline">${img}` +
+            `<div class="fk-cline__body">` +
+            `<p class="fk-cline__title">${titleInner}</p>${variant}` +
+            `<div class="fk-stepper" data-ik-stepper>` +
+            `<button type="button" class="fk-stepper__btn" data-ik-dec="${id}" aria-label="Reduce quantity">−</button>` +
+            `<input class="fk-stepper__input" type="number" min="0" inputmode="numeric" value="${Number(l.quantity)}" data-ik-qty="${id}" aria-label="Quantity">` +
+            `<button type="button" class="fk-stepper__btn" data-ik-inc="${id}" aria-label="Increase quantity">+</button>` +
+            `</div></div>` +
+            `<div class="fk-cline__side">` +
+            `<p class="fk-cline__price">${money(l.price * l.quantity, currency, locale)}</p>` +
+            `<button type="button" class="fk-cline__remove" data-ik-remove="${id}">Remove</button>` +
+            `</div></li>`);
+    }
+    function paint() {
+        const cart = sdk.cart.get();
+        const lines = cart.items.map(toLine);
+        const n = lines.reduce((s, l) => s + l.quantity, 0);
+        allEls(root, 'cart-count').forEach((el) => {
+            el.textContent = String(n);
+            el.hidden = n === 0;
+        });
+        allEls(root, 'cart-total').forEach((el) => {
+            el.textContent = money(cart.subtotal, currency, locale);
+        });
+        allEls(root, 'cart-lines').forEach((el) => {
+            el.innerHTML = lines.length ? lines.map(lineHTML).join('') : EMPTY_LINE_HTML;
+        });
+        allEls(root, 'cart-empty').forEach((el) => {
+            el.hidden = lines.length > 0;
+        });
+        allEls(root, 'cart-filled').forEach((el) => {
+            el.hidden = lines.length === 0;
+        });
+    }
+    /* ── drawer ───────────────────────────────────────────────────────── */
+    function open() {
+        const d = firstEl(root, 'drawer');
+        if (!d)
+            return;
+        d.hidden = false;
+        const raf = typeof requestAnimationFrame === 'function'
+            ? requestAnimationFrame
+            : (cb) => setTimeout(() => cb(0), 0);
+        raf(() => d.classList.add('is-open'));
+        if (doc.body)
+            doc.body.classList.add('fk-noscroll');
+        const close = firstEl(d, 'drawer-close');
+        if (close)
+            close.focus();
+    }
+    function close() {
+        const d = firstEl(root, 'drawer');
+        if (!d)
+            return;
+        d.classList.remove('is-open');
+        if (doc.body)
+            doc.body.classList.remove('fk-noscroll');
+        setTimeout(() => {
+            d.hidden = true;
+        }, 240);
+    }
+    /* ── checkout ─────────────────────────────────────────────────────── */
+    async function doCheckout(form) {
+        const data = Object.fromEntries(new FormData(form).entries());
+        const status = firstEl(form, 'checkout-status');
+        const btn = form.querySelector('[type=submit]');
+        if (btn) {
+            btn.disabled = true;
+            btn.dataset.idle = btn.textContent || '';
+            btn.textContent = 'Working…';
+        }
+        if (status) {
+            status.hidden = false;
+            status.className = 'fk-note';
+            status.textContent = 'Placing your order…';
+        }
+        const name = (data.name || '').trim();
+        const customer = {
+            email: data.email,
+            first_name: data.first_name || name.split(/\s+/)[0] || undefined,
+            last_name: data.last_name || name.split(/\s+/).slice(1).join(' ') || undefined,
+            phone: data.phone || undefined,
+        };
+        // Map the checkout form's address fields to the SDK Address shape; sent as
+        // data.shipping_address so the session persists a ship-to for fulfilment.
+        const shipping = {
+            street: data.line1 || data.street || undefined,
+            street_optional: data.line2 || undefined,
+            city: data.city || undefined,
+            region: data.region || undefined,
+            state: data.state || data.region || undefined,
+            country: data.country || undefined,
+            postal_code: data.postcode || data.postal_code || undefined,
+        };
+        const hasShipping = Object.values(shipping).some(Boolean);
+        try {
+            const res = await sdk.cart.checkout(hasShipping ? { customer, data: { shipping_address: shipping } } : { customer });
+            if (res.state !== 'ok' || !res.result) {
+                throw new Error('We could not place the order.');
+            }
+            sdk.cart.clear();
+            const to = res.result.frame_url;
+            if (opts.checkoutRedirect && to)
+                opts.navigate(to);
+        }
+        catch (err) {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = btn.dataset.idle || 'Place order';
+            }
+            if (status) {
+                status.hidden = false;
+                status.className = 'fk-note fk-note--bad';
+                status.textContent = err instanceof Error ? err.message : 'Something went wrong.';
+            }
+        }
+    }
+    /* ── delegated listeners ──────────────────────────────────────────── */
+    function onClick(e) {
+        const target = e.target;
+        const addBtn = closestHook(target, 'add');
+        if (addBtn) {
+            e.preventDefault();
+            const box = closestHook(addBtn, 'buy') || root;
+            const sel = firstEl(box, 'variant');
+            const opt = sel && sel.options ? sel.options[sel.selectedIndex] : null;
+            const qtyEl = firstEl(box, 'buy-qty');
+            const fields = readFields(opt || addBtn);
+            addFromFields(sdk, fields, qtyEl ? qtyEl.value : '1', currency);
+            if (hasHook(addBtn, 'buynow')) {
+                opts.navigate(opts.checkoutPath);
+                return;
+            }
+            if (opts.autoOpenDrawerOnAdd)
+                open();
+            return;
+        }
+        if (closestHook(target, 'drawer-open')) {
+            e.preventDefault();
+            paint();
+            open();
+            return;
+        }
+        if (closestHook(target, 'drawer-close') || hasHook(target, 'drawer-scrim')) {
+            close();
+            return;
+        }
+        const buyStep = closestHook(target, 'buy-inc') || closestHook(target, 'buy-dec');
+        if (buyStep) {
+            const isInc = hasHook(buyStep, 'buy-inc');
+            const box = closestHook(buyStep, 'buy') || root;
+            const q = firstEl(box, 'buy-qty');
+            if (q) {
+                const next = Math.max(1, (parseInt(q.value, 10) || 1) + (isInc ? 1 : -1));
+                const max = q.getAttribute('max');
+                q.value = String(max ? Math.min(next, Number(max)) : next);
+            }
+            return;
+        }
+        const rm = closestHook(target, 'remove');
+        if (rm) {
+            const id = hookValue(rm, 'remove');
+            if (id != null)
+                sdk.cart.removeProduct(Number(id));
+            return;
+        }
+        const inc = closestHook(target, 'inc');
+        if (inc) {
+            const id = hookValue(inc, 'inc');
+            if (id != null)
+                lineInc(sdk, id);
+            return;
+        }
+        const dec = closestHook(target, 'dec');
+        if (dec) {
+            const id = hookValue(dec, 'dec');
+            if (id != null)
+                lineDec(sdk, id);
+            return;
+        }
+    }
+    function onChange(e) {
+        const target = e.target;
+        const q = closestHook(target, 'qty');
+        if (q) {
+            const id = hookValue(q, 'qty');
+            if (id != null)
+                lineSetQty(sdk, id, q.value);
+            return;
+        }
+        const sel = closestHook(target, 'variant');
+        if (sel && sel.options) {
+            const o = sel.options[sel.selectedIndex];
+            const box = closestHook(sel, 'buy');
+            if (!box || !o)
+                return;
+            const priceEl = firstEl(box, 'buy-price');
+            if (priceEl)
+                priceEl.textContent = money(Number(attr(o, 'price') || 0), currency, locale);
+            const stockEl = firstEl(box, 'buy-stock');
+            if (stockEl)
+                stockEl.textContent = attr(o, 'stock-label') || '';
+            const btn = firstEl(box, 'add');
+            if (btn) {
+                const out = attr(o, 'sold-out') === '1';
+                btn.disabled = out;
+                btn.textContent = out ? 'Sold out' : attr(btn, 'label') || btn.textContent || 'Add to bag';
+            }
+        }
+    }
+    function onSubmit(e) {
+        const target = e.target;
+        const form = closestHook(target, 'checkout');
+        if (form) {
+            e.preventDefault();
+            void doCheckout(form);
+        }
+    }
+    function onKeydown(e) {
+        if (e.key === 'Escape')
+            close();
+    }
+    doc.addEventListener('click', onClick);
+    doc.addEventListener('change', onChange);
+    doc.addEventListener('submit', onSubmit);
+    doc.addEventListener('keydown', onKeydown);
+    return {
+        paint,
+        open,
+        close,
+        unmount() {
+            doc.removeEventListener('click', onClick);
+            doc.removeEventListener('change', onChange);
+            doc.removeEventListener('submit', onSubmit);
+            doc.removeEventListener('keydown', onKeydown);
+        },
+    };
+}
+
+function toHookFields(input) {
+    var _a, _b, _c, _d, _f, _g;
+    const variantId = (_a = input.variantId) !== null && _a !== void 0 ? _a : input.variant_id;
+    const postId = (_b = input.postId) !== null && _b !== void 0 ? _b : input.post_id;
+    const variantName = (_c = input.variantName) !== null && _c !== void 0 ? _c : input.variant_name;
+    let unlimited;
+    let stock;
+    if ('max' in input && input.stock == null) {
+        // Legacy fkCart shape: `max === null` means unlimited.
+        unlimited = input.max == null ? '1' : '0';
+        stock = input.max == null ? null : String(input.max);
+    }
+    else {
+        const u = input.unlimited;
+        unlimited = u == null ? null : u === true || u === '1' || u === 'true' ? '1' : '0';
+        stock = input.stock == null ? null : String(input.stock);
+    }
+    return {
+        variantId: variantId != null ? String(variantId) : null,
+        postId: postId != null ? String(postId) : null,
+        title: (_d = input.title) !== null && _d !== void 0 ? _d : null,
+        variantName: variantName !== null && variantName !== void 0 ? variantName : null,
+        image: (_f = input.image) !== null && _f !== void 0 ? _f : null,
+        href: (_g = input.href) !== null && _g !== void 0 ? _g : null,
+        price: input.price != null ? String(input.price) : null,
+        stock,
+        unlimited,
+    };
+}
+/**
+ * Mount the DOM kit onto an SDK instance. Wires delegated hooks and the
+ * emitter→DOM event bridge, publishes globals, paints the cart once, and returns a
+ * handle whose `unmount()` removes everything.
+ */
+function mountStorefront(sdk, options = {}) {
+    const root = options.root || (typeof document !== 'undefined' ? document : undefined);
+    const doc = root.nodeType === 9
+        ? root
+        : root.ownerDocument || document;
+    const eventTarget = options.eventTarget || doc;
+    const currency = options.currencyCode || doc.documentElement.getAttribute('data-currency') || 'USD';
+    const locale = options.locale || doc.documentElement.getAttribute('lang') || 'en';
+    const emitLegacy = options.emitLegacyFkEvents !== false;
+    const exposeGlobals = options.exposeGlobals !== false;
+    const navigate = options.navigate ||
+        ((url) => {
+            if (typeof window !== 'undefined' && window.location) {
+                try {
+                    window.location.href = url;
+                }
+                catch (_e) {
+                    /* jsdom / SSR — navigation is a no-op */
+                }
+            }
+        });
+    const controller = mountCartController(sdk, {
+        root,
+        doc,
+        currency,
+        locale,
+        autoOpenDrawerOnAdd: options.autoOpenDrawerOnAdd !== false,
+        checkoutRedirect: options.checkoutRedirect !== false,
+        checkoutPath: options.checkoutPath || '/checkout',
+        navigate,
+    });
+    const unbindEvents = bindCartEvents(sdk, {
+        target: eventTarget,
+        emitLegacy,
+        onChange: () => controller.paint(),
+    });
+    const cart = {
+        read: () => ({ items: readLines(sdk) }),
+        add: (fields, qty) => addFromFields(sdk, toHookFields(fields), qty !== null && qty !== void 0 ? qty : 1, currency),
+        addProduct: (product, qty) => {
+            sdk.cart.addItem(product, qty !== null && qty !== void 0 ? qty : 1);
+        },
+        setQty: (id, qty) => lineSetQty(sdk, id, qty),
+        remove: (id) => {
+            sdk.cart.removeProduct(Number(id));
+        },
+        clear: () => {
+            sdk.cart.clear();
+        },
+        count: () => count(sdk),
+        subtotal: () => subtotal(sdk),
+        money: (amountMajor) => money(amountMajor, currency, locale),
+        open: () => controller.open(),
+        close: () => controller.close(),
+    };
+    const win = typeof window !== 'undefined' ? window : null;
+    if (exposeGlobals && win) {
+        win.inkressCart = cart;
+        if (emitLegacy && win.fkCart == null)
+            win.fkCart = cart;
+    }
+    if (options.paintOnMount !== false)
+        controller.paint();
+    return {
+        paint: () => controller.paint(),
+        open: () => controller.open(),
+        close: () => controller.close(),
+        cart,
+        unmount() {
+            unbindEvents();
+            controller.unmount();
+            if (exposeGlobals && win) {
+                if (win.inkressCart === cart)
+                    delete win.inkressCart;
+                if (win.fkCart === cart)
+                    delete win.fkCart;
+            }
+        },
+    };
+}
+
+/**
  * Main Inkress Storefront SDK class
  *
  * @example
@@ -4417,6 +5076,7 @@ exports.getProductAvailableStock = getProductAvailableStock;
 exports.getProductCustomFields = getProductCustomFields;
 exports.getProductCustomerInputs = getProductCustomerInputs;
 exports.isProductInStock = isProductInStock;
+exports.mountStorefront = mountStorefront;
 exports.normalizeFacetRow = normalizeFacetRow;
 exports.processQuery = processQuery;
 exports.toProductStock = toProductStock;

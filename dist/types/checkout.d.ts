@@ -153,8 +153,19 @@ export interface FeesQuote {
     customer_total?: number;
     [key: string]: unknown;
 }
-/** Why a discount code was refused — the machine-readable `reason` slug (Service.Discount). */
-export type DiscountRejectReason = 'not_found' | 'inactive' | 'expired' | 'usage_limit_reached' | 'per_customer_limit_reached' | 'not_valid_for_items' | 'currency_mismatch' | 'min_spend_not_met';
+/**
+ * Why a discount code was refused — the machine-readable `reason` slug (Service.Discount).
+ *
+ * Currency handling: a fixed-amount code priced in another currency is CONVERTED to the
+ * order currency (e.g. a J$500 code applies as US$3.125 on a USD order) rather than
+ * refused, and percentage codes are currency-agnostic — so a code's currency differing
+ * from the order's is never on its own a rejection. `currency_mismatch` fires ONLY when
+ * there is no exchange rate for the pair (an unsupported currency). The quote/order
+ * responses are unchanged; `discount_total` simply reflects the converted amount.
+ */
+export type DiscountRejectReason = 'not_found' | 'inactive' | 'expired' | 'usage_limit_reached' | 'per_customer_limit_reached' | 'not_valid_for_items'
+/** No exchange rate for the code's currency ↔ the order currency (unsupported pair). */
+ | 'currency_mismatch' | 'min_spend_not_met';
 /** One cart line for a product-scoped discount quote. */
 export interface DiscountLineInput {
     /** Product id — matches order-line freezing + scope eligibility (== variant_id today). */
