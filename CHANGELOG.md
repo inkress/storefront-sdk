@@ -5,6 +5,35 @@ All notable changes to the Inkress Storefront SDK will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-09-20
+
+Order-first checkout money path (additive) — the discount-preserving, 3DS-hardened
+path the live `commerce-web` `/checkouts/:id` page uses, so a storefront can drive the
+whole checkout through the SDK. Contracts grounded in commerce-api + commerce-web.
+
+### Added
+- **Order-first checkout** on `sdk.checkout` (`CheckoutResource`):
+  - `invoice(uid)` — load the payment-link invoice/order (embeds order + merchant).
+  - `fees(params, username?)` — merchant fee quote (discount-inclusive; lenient on a bad code).
+  - `validateDiscount(params, username?)` — server-authoritative discount quote; both accept
+    and reject resolve (branch on `data.valid`). Pass `products` for a product-scoped code
+    (sent as a POST body, since a `products[]` can't be querystring-encoded). Reject `reason`
+    is a typed `DiscountRejectReason`.
+  - `merchantTokens(username?)` — the merchant public key that authorizes order creation.
+  - `createOrder(input)` — structured input flattened to the backend's dot-keyed body
+    (customer / products / shipping / discount / meta_data); the server re-prices, re-resolves
+    the discount under a lock, and re-validates shipping.
+  - PowerTranz 3DS off the order's own payment-link uid: `checkoutIntent`, `chargeCard`,
+    `complete3ds`.
+- New types: `FeesQuote`, `DiscountQuote`, `DiscountRejectReason`, `DiscountLineInput`,
+  `CreateOrderInput`, `CreateOrderResult`, `InvoiceDisplay`, `CheckoutIntent`,
+  `ChargeCardInput`, `Complete3dsInput`, `PublicDataResponse`, plus the param types.
+
+### Note
+- The order-first path is the discount-preserving path; the session path (`createSession`)
+  cannot apply discounts server-side yet. The quote is ADVISORY — order creation re-checks
+  the code under a lock, so handle a rejection at `createOrder` even after a green quote.
+
 ## [1.1.2] - 2026-08-09
 
 Storefront capability release (additive). Every shape is grounded in the Commerce

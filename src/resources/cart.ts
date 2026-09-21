@@ -347,7 +347,7 @@ export class CartResource {
       quantity: cart.total_items,
       items: cart.items.map(item => ({
         product_id: item.product.id,
-        variant_id: item.product.id, // TODO: Add variant support
+        variant_id: item.product.id, // In Inkress the product is the buyable unit: variant_id == product id (no separate variant entity today).
         quantity: item.quantity,
         unit_price: item.price
       }))

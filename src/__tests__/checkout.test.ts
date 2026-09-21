@@ -149,3 +149,146 @@ describe('cart.checkout() via the SDK facade', () => {
     expect(res.result?.session_id).toBe('S.3');
   });
 });
+
+describe('CheckoutResource order-first money path', () => {
+  const checkout = () => new CheckoutResource(new HttpClient({ merchantUsername: 'acme' }));
+
+  it('invoice() POSTs the payment-link uid and returns the data payload', async () => {
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', data: { id: 'L.1', order: { id: 9 }, merchant: { username: 'acme' } } }));
+    const res = await checkout().invoice('L.1');
+    expect(lastCall()[0]).toContain('/api/v1/payments/link/L.1');
+    expect((lastCall()[1] as RequestInit).method).toBe('POST');
+    expect((res.data as any).order.id).toBe(9);
+  });
+
+  it('fees() GETs the public fees endpoint with the query and defaults to the configured merchant', async () => {
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', data: { sub_total: 100, discount_total: 0, total: 105 } }));
+    const res = await checkout().fees({ currency_code: 'JMD', total: 100, fulfillment_total: 5 });
+    const url = lastCall()[0] as string;
+    expect(url).toContain('/api/v1/public/m/acme/fees');
+    expect(url).toContain('currency_code=JMD');
+    expect(url).toContain('total=100');
+    expect(url).toContain('fulfillment_total=5');
+    expect((res.data as any).sub_total).toBe(100);
+  });
+
+  it('fees() uses an explicit username over the configured merchant', async () => {
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', data: {} }));
+    await checkout().fees({ currency_code: 'JMD', total: 10 }, 'other-shop');
+    expect(lastCall()[0]).toContain('/api/v1/public/m/other-shop/fees');
+  });
+
+  it('validateDiscount() resolves (not throws) for both accepted and rejected codes', async () => {
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', data: { valid: true, discount_code: 'SAVE10', discount_total: 10 } }));
+    const ok = await checkout().validateDiscount({ code: 'SAVE10', currency_code: 'JMD', total: 100 });
+    expect(lastCall()[0]).toContain('/api/v1/public/m/acme/discount');
+    expect(lastCall()[0]).toContain('code=SAVE10');
+    expect((ok.data as any).valid).toBe(true);
+
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', data: { valid: false, discount_code: 'NOPE', reason: 'expired', message: 'That code has expired.' } }));
+    const rejected = await checkout().validateDiscount({ code: 'NOPE', currency_code: 'JMD', total: 100 });
+    expect((rejected.data as any).valid).toBe(false);
+    expect((rejected.data as any).reason).toBe('expired');
+  });
+
+  it('validateDiscount() POSTs cart lines (id + per-line cost) for a product-scoped code', async () => {
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', data: { valid: true, discount_code: 'ITEMS5', discount_total: 5 } }));
+    await checkout().validateDiscount({
+      code: 'ITEMS5',
+      currency_code: 'JMD',
+      total: 100,
+      products: [{ id: 42, cost: 60 }, { id: 7, cost: 40 }],
+    });
+    expect(lastCall()[0]).toContain('/api/v1/public/m/acme/discount');
+    expect((lastCall()[1] as RequestInit).method).toBe('POST');
+    const body = JSON.parse((lastCall()[1] as RequestInit).body as string);
+    expect(body.code).toBe('ITEMS5');
+    expect(body.products).toEqual([{ id: 42, cost: 60 }, { id: 7, cost: 40 }]);
+  });
+
+  it('merchantTokens() reads data[0].public_key', async () => {
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', data: [{ public_key: 'pk_live_123' }] }));
+    const res = await checkout().merchantTokens();
+    expect(lastCall()[0]).toContain('/api/v1/public/m/acme/tokens');
+    expect((res.data as any)[0].public_key).toBe('pk_live_123');
+  });
+
+  it('createOrder() POSTs /orders with a flat dot-keyed body (JM delivery → town)', async () => {
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', result: { id: 'O.1', payment_urls: { short_link: 'https://inkress.com/payments/link/PL.1/fac' } } }));
+    const res = await checkout().createOrder({
+      reference_id: 'ref-1',
+      currency_code: 'JMD',
+      discount_code: 'SAVE10',
+      customer: { first_name: 'Ada', last_name: 'Lovelace', email: 'ada@x.com', phone: '8761234567' },
+      products: [{ id: 42, quantity: 2, properties: { size: 'L' } }],
+      payment_link_id: 7,
+      fulfillment_type: 'delivery',
+      fulfillment_total: 500,
+      shipping_address: { country: 'JM', state: 'Kingston', street: '1 King St', town: 'Kingston' },
+      note: 'leave at door',
+      meta_data: { order_source: 'checkouts' },
+    });
+    expect(lastCall()[0]).toContain('/api/v1/orders');
+    expect((lastCall()[1] as RequestInit).method).toBe('POST');
+    const body = JSON.parse((lastCall()[1] as RequestInit).body as string);
+    expect(body).toMatchObject({
+      reference_id: 'ref-1',
+      kind: 'online',
+      currency_code: 'JMD',
+      discount_code: 'SAVE10',
+      'customer.first_name': 'Ada',
+      'customer.email': 'ada@x.com',
+      'customer.phone': '8761234567',
+      payment_link_id: 7,
+      fulfillment_total: 500,
+      'data.fulfillment_type': 'delivery',
+      'data.shipping_address.town': 'Kingston',
+      'data.shipping_address.street': '1 King St',
+      'data.fulfillment_total': 500,
+      'data.note': 'leave at door',
+      'meta_data.order_source': 'checkouts',
+    });
+    expect(body.products).toEqual([{ id: 42, quantity: 2, properties: { size: 'L' } }]);
+    expect(body['data.shipping_address.city']).toBeUndefined();
+    expect(res.result?.payment_urls?.short_link).toContain('/PL.1/fac');
+  });
+
+  it('createOrder() maps a pickup fulfilment and a non-JM city', async () => {
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', result: { id: 'O.2' } }));
+    await checkout().createOrder({
+      reference_id: 'ref-2',
+      currency_code: 'USD',
+      customer: { first_name: 'Al', last_name: 'Turing', email: 'al@x.com' },
+      products: [{ id: 1, quantity: 1 }],
+      fulfillment_type: 'pickup',
+      pickup_location: 'Main St store',
+    });
+    const body = JSON.parse((lastCall()[1] as RequestInit).body as string);
+    expect(body['data.fulfillment_type']).toBe('pickup');
+    expect(body['data.pickup_location']).toBe('Main St store');
+    expect(body['data.shipping_address.town']).toBeUndefined();
+  });
+
+  it('checkoutIntent / chargeCard / complete3ds hit the payment-link 3DS routes', async () => {
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', data: { amount: 105, currency: 388, sig: 'abc', ref: 'PL.1', exp: 1 } }));
+    const intent = await checkout().checkoutIntent('PL.1', { mode: 'card' });
+    expect(lastCall()[0]).toContain('/api/v1/payments/link/PL.1/checkout-intent');
+    expect((intent.data as any).amount).toBe(105);
+
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', data: { requires_3ds: true, spi_token: 'spi.1' } }));
+    await checkout().chargeCard('PL.1', { card_ref: 'card.1' });
+    expect(lastCall()[0]).toContain('/api/v1/payments/link/PL.1/charge-card');
+    expect(JSON.parse((lastCall()[1] as RequestInit).body as string).card_ref).toBe('card.1');
+
+    fetchMock.mockResponseOnce(JSON.stringify({ state: 'ok', data: { paid: true } }));
+    await checkout().complete3ds('PL.1', { spi_token: 'spi.1' });
+    expect(lastCall()[0]).toContain('/api/v1/payments/link/PL.1/complete-3ds');
+    expect(JSON.parse((lastCall()[1] as RequestInit).body as string).spi_token).toBe('spi.1');
+  });
+
+  it('a public read throws when no merchant is configured or passed', async () => {
+    await expect(new CheckoutResource(new HttpClient()).fees({ currency_code: 'JMD', total: 10 })).rejects.toThrow(
+      /merchant username is required/i,
+    );
+  });
+});
