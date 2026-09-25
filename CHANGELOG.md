@@ -5,6 +5,10 @@ All notable changes to the Inkress Storefront SDK will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-09-25
+
+- `cards` resource (Ink Pay): `list`, `remove`, `feeDisclosure`, `connectIntent` (opens a connect with the accepted fee disclosure and returns the mode "store" checkout intent for the hosted card frame), `completeConnect` (polls the pending completion with bounded backoff).
+
 ## [Unreleased]
 
 Storefront DOM kit (additive) — the SDK gains FleekSite's two declarative
