@@ -4,7 +4,7 @@
  */
 import { HttpClient, InkressApiError } from '../client';
 import { CheckoutResource } from '../resources/checkout';
-import { CardsResource, CardConnectPendingError } from '../resources/cards';
+import { CardsResource, CardConnectPendingError, CardConnectContractError } from '../resources/cards';
 import { InkressStorefrontSDK } from '../index';
 import type { FeeDisclosure } from '../types/cards';
 
@@ -105,6 +105,22 @@ describe('CardsResource', () => {
     );
 
     await expect(cards.connectIntent({ acceptedDisclosureVersion: 'fd1-stale' })).rejects.toMatchObject({ status: 409 });
+    expect(calls()).toHaveLength(1);
+  });
+
+  it('connectIntent throws CardConnectContractError when the server omits fee_disclosure', async () => {
+    fetchMock.mockResponseOnce(
+      envelope('ok', {
+        reference_id: 'cardconn-v1-7-abc',
+        payment_link_uid: 'plu_123',
+        checkout_intent: { path: '/api/v1/payments/link/plu_123/checkout-intent', mode: 'store' },
+        // fee_disclosure omitted — today's live server (pre Task 5/6) doesn't send it yet.
+      }),
+    );
+
+    await expect(
+      cards.connectIntent({ acceptedDisclosureVersion: disclosure.version }),
+    ).rejects.toBeInstanceOf(CardConnectContractError);
     expect(calls()).toHaveLength(1);
   });
 

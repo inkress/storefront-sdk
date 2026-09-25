@@ -11,6 +11,8 @@ import type {
   CompleteConnectOptions,
   ConnectedCard,
   FeeDisclosure,
+  FeeDisclosureComponent,
+  FeeDisclosureExample,
   SavedCard,
 } from '../types/cards';
 
@@ -32,6 +34,54 @@ export class CardConnectPendingError extends Error {
     this.attempts = attempts;
   }
 }
+
+/**
+ * Thrown when a `/cards/connect` response doesn't match the `CardConnectStart` contract this SDK
+ * targets — today, specifically a missing or malformed `fee_disclosure` (required in the types as
+ * the P5 target contract, shipped by Tasks 5/6, but not every server has it yet). Guards the
+ * network boundary so a stale/partial server degrades to a clear, typed failure instead of a
+ * `TypeError` on `undefined` deep in caller code.
+ */
+export class CardConnectContractError extends Error {
+  public readonly details?: unknown;
+
+  constructor(message: string, details?: unknown) {
+    super(message);
+    this.name = 'CardConnectContractError';
+    this.details = details;
+  }
+}
+
+const isFeeDisclosureComponent = (value: unknown): value is FeeDisclosureComponent => {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.kind === 'string' && typeof v.payer === 'string';
+};
+
+const isFeeDisclosureExample = (value: unknown): value is FeeDisclosureExample => {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.amount === 'number' && typeof v.fee === 'number' && typeof v.total === 'number' && typeof v.currency === 'string'
+  );
+};
+
+/** Runtime type-guard for the network boundary: `fee_disclosure` is required in {@link FeeDisclosure}
+ * but must still be validated, since a server that hasn't shipped it yet can send it missing or malformed. */
+const isFeeDisclosure = (value: unknown): value is FeeDisclosure => {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.version === 'string' &&
+    v.version.length > 0 &&
+    typeof v.customer_pays_fees === 'boolean' &&
+    Array.isArray(v.components) &&
+    v.components.every(isFeeDisclosureComponent) &&
+    isFeeDisclosureExample(v.example) &&
+    typeof v.text === 'string' &&
+    v.text.length > 0
+  );
+};
 
 /**
  * The logged-in shopper's saved cards on this merchant (Ink Pay, INK-438). Requires the shopper
@@ -73,6 +123,9 @@ export class CardsResource {
     const start = started.result;
     if (started.state !== 'ok' || !start) {
       throw new InkressApiError('Card connect could not be started', 0, started);
+    }
+    if (!isFeeDisclosure(start.fee_disclosure)) {
+      throw new CardConnectContractError('server did not return a fee disclosure — upgrade the API', start.fee_disclosure);
     }
 
     const intent = await this.checkout.checkoutIntent(start.payment_link_uid, { mode: 'store' });

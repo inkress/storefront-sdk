@@ -76,7 +76,7 @@ export {
   normalizeFacetRow,
 } from './utils/variants';
 export { AddressesResource } from './resources/addresses';
-export { CardsResource, CardConnectPendingError } from './resources/cards';
+export { CardsResource, CardConnectPendingError, CardConnectContractError } from './resources/cards';
 export * from './types/cards';
 
 // Storefront DOM kit — the opt-in `data-ik-*` / `data-fk-*` hooks + `ik:cart` /
