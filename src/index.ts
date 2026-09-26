@@ -17,6 +17,7 @@ import { ShippingResource } from './resources/shipping';
 import { FilesResource } from './resources/files';
 import { CheckoutResource } from './resources/checkout';
 import { AddressesResource } from './resources/addresses';
+import { CardsResource } from './resources/cards';
 
 export * from './types/checkout';
 export { CheckoutResource } from './resources/checkout';
@@ -26,7 +27,7 @@ export type { CheckoutInitiator, CartCheckoutOptions } from './resources/cart';
 export * from './types';
 export { InkressApiError } from './client';
 // ApiResponse/StorefrontConfig/ErrorResponse/SdkMode come through `export * from './types'`.
-export type { HttpClient, RequestOptions } from './client';
+export type { HttpClient, RequestOptions, AuthTokenKind } from './client';
 
 // Re-export payment helpers so consumers can build hosted-checkout URLs directly.
 export {
@@ -75,6 +76,17 @@ export {
   normalizeFacetRow,
 } from './utils/variants';
 export { AddressesResource } from './resources/addresses';
+export {
+  CardsResource,
+  CardConnectPendingError,
+  CardConnectContractError,
+  CardConnectError,
+  CardOwnerSessionRequiredError,
+  CardAlreadyRemovedError,
+  CardConnectIntentFailedError,
+  type CardConnectRefusalReason,
+} from './resources/cards';
+export * from './types/cards';
 
 // Storefront DOM kit — the opt-in `data-ik-*` / `data-fk-*` hooks + `ik:cart` /
 // `fk:cart` DOM events over the existing cart. Importing the SDK does not touch the
@@ -181,6 +193,7 @@ export class InkressStorefrontSDK {
   public readonly files: FilesResource;
   public readonly checkout: CheckoutResource;
   public readonly addresses: AddressesResource;
+  public readonly cards: CardsResource;
 
   constructor(config: StorefrontConfig = {}) {
     // Initialize core components
@@ -201,6 +214,7 @@ export class InkressStorefrontSDK {
     this.files = new FilesResource(this.client);
     this.checkout = new CheckoutResource(this.client);
     this.addresses = new AddressesResource(this.client);
+    this.cards = new CardsResource(this.client, this.checkout);
 
     // Initialize cart and wishlist with storage, events, and client
     this.cart = new CartResource(

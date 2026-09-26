@@ -127,6 +127,11 @@ export class CheckoutResource {
    * Fetch the merchant's public keys. `data[0].public_key` is the bearer token
    * that authorizes {@link createOrder} — set it via `sdk.setAuthToken(...)`
    * before creating the order.
+   *
+   * Do NOT reuse this `public_key` for `sdk.cards.*` — those need the shopper's OWN session JWT
+   * (from `auth.login`/`register`), never a merchant key (I-S2, final-review fix). Using this key
+   * for `cards.connectIntent` would vault the shopper's card onto the key's OWNER, not the
+   * shopper; see {@link CardsResource}'s class doc.
    */
   async merchantTokens(username?: string): Promise<PublicDataResponse<MerchantToken[]>> {
     const u = this.requireUsername(username);

@@ -85,6 +85,7 @@ so you can build a merchant's own storefront/admin, not for untrusted clients:
 | --- | --- |
 | Public (Client-Id only) | `merchants.*`, `products.*`, `categories` reads, `reviews` reads, `shipping` reads, `checkout.*`, `files.upload`, local `cart.*` |
 | Customer (Bearer) | `auth.getProfile/updateProfile/changePassword`, `orders.list/create`, `reviews.create`, `wishlist` remote sync |
+| **Shopper session (Bearer JWT from `auth.login`/`register`) — never the merchant `public_key`** | `cards.list/remove/connectIntent/completeConnect` (Ink Pay saved cards) — using `checkout.merchantTokens()`'s `public_key` here vaults the card under the wrong user; see `CardsResource`'s class doc |
 | Merchant/admin (privileged Bearer) | `categories.create/update/delete`, `shipping.create*/update*/delete*`, `files.update/delete`, `generics.create/update/delete` |
 
 ```typescript
@@ -221,6 +222,46 @@ await sdk.addresses.create({
 });
 await sdk.addresses.update(addressId, { city: 'Montego Bay' });
 await sdk.addresses.delete(addressId);
+```
+
+### Saved cards (Ink Pay)
+
+The shopper's own saved cards (`/cards`) — list, remove, and connect a new one. **Requires the
+shopper's session JWT** from `sdk.auth.login`/`register` (see [Auth (customer)](#auth-customer)
+above) — **never** the merchant `public_key` from `checkout.merchantTokens()`. Using the merchant
+key here would vault the card onto the key's OWNER, not the shopper; `connectIntent` refuses a
+`pk_`/`sk_` token client-side, and the server refuses everything else with a typed
+`CardOwnerSessionRequiredError`.
+
+```typescript
+const { result } = await sdk.auth.login({ email, password });
+sdk.setAuthToken(result!.token); // the shopper's OWN session — not a merchant public_key
+
+const { result: cards } = await sdk.cards.list();
+
+const { result: disclosure } = await sdk.cards.feeDisclosure();
+// show disclosure.text to the shopper before connecting a card
+
+import { CardConnectError, CardConnectPendingError } from '@inkress/storefront-sdk';
+
+try {
+  const { intent, reference_id } = await sdk.cards.connectIntent({
+    acceptedDisclosureVersion: disclosure!.version,
+    returnBase: 'https://shop.example.com',
+  });
+  // mount your hosted card frame with `intent`, then poll for completion:
+  const account = await sdk.cards.completeConnect(reference_id);
+} catch (error) {
+  if (error instanceof CardConnectError && error.reason === 'fee_disclosure_changed') {
+    // error.feeDisclosure carries the NEW terms — re-show them and restart
+  } else if (error instanceof CardConnectPendingError) {
+    // safe to call completeConnect(reference_id) again later
+  } else {
+    throw error;
+  }
+}
+
+await sdk.cards.remove(cardId);
 ```
 
 ## Cart

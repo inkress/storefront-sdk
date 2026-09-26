@@ -47,6 +47,14 @@ export interface ErrorResponse {
     | Record<string, string[]>;
 }
 
+/**
+ * The KIND of a configured `authToken`, never the token itself (I-S2, final-review fix). `pk_` /
+ * `sk_` are merchant API keys (a live credential belonging to the merchant's key OWNER) — never a
+ * shopper session — anything else non-empty is treated as a session-style token (a JWT from
+ * `auth.login`/`register`). `cards.*` requires `'session'`; see `CardsResource`'s class doc.
+ */
+export type AuthTokenKind = 'none' | 'session' | 'public_key' | 'secret_key';
+
 const LIVE_API = 'https://api.inkress.com';
 const SANDBOX_API = 'https://api-dev.inkress.com';
 const LIVE_SITE = 'https://inkress.com';
@@ -109,6 +117,19 @@ export class HttpClient {
 
   getMerchantUsername(): string {
     return this.config.merchantUsername;
+  }
+
+  /**
+   * The KIND of the configured `authToken` — never the token itself. Cheap, non-secret pre-flight
+   * for a caller that needs to tell a merchant API key apart from a shopper session before
+   * sending it anywhere (see `CardsResource.connectIntent`'s guard, I-S2).
+   */
+  getAuthTokenKind(): AuthTokenKind {
+    const token = this.config.authToken;
+    if (!token) return 'none';
+    if (token.startsWith('pk_')) return 'public_key';
+    if (token.startsWith('sk_')) return 'secret_key';
+    return 'session';
   }
 
   private getHeaders(additionalHeaders: Record<string, string> = {}): Record<string, string> {

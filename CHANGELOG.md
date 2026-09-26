@@ -32,6 +32,46 @@ model. Opt-in: importing the SDK still touches nothing until `mountStorefront` r
 - New types: `StorefrontDomOptions`, `StorefrontDomHandle`, `StorefrontCartApi`,
   `CartAddInput`, `FleekLine`, `HookFields`, `IkCartDetail`.
 
+## [1.3.0] - 2026-09-25
+
+- `cards` resource (Ink Pay): `list`, `remove`, `feeDisclosure`, `connectIntent` (opens a connect with the accepted fee disclosure and returns the mode "store" checkout intent for the hosted card frame), `completeConnect` (polls the pending completion with bounded backoff).
+
+### Fixed (final-review fix wave, same day)
+
+- **`cards.*` needs the shopper's OWN session JWT — never the merchant `public_key`.** Reusing
+  checkout's `setAuthToken(public_key)` for `cards.connectIntent` would vault the shopper's card
+  onto the merchant key's OWNER, not the shopper (I-S2). `connectIntent` now refuses a `pk_`/`sk_`
+  token client-side before any network call, and the identical server-side `403` (now also
+  enforced on `connect/2`, closing that seam) is typed the same way everywhere as
+  `CardOwnerSessionRequiredError` on `list`/`remove`/`connectIntent`.
+- **Connect/complete refusals are now typed** (`CardConnectError`, `reason`): the new `409`
+  `card_removed` (a replay after the account was removed/disconnected), `fee_consent_missing`,
+  `owner_mismatch`, `reference_mismatch`, `order_not_found`, `connect_order_captured`, and — on
+  `connectIntent` — `fee_disclosure_changed` / `fee_disclosure_version_required` (both carry the
+  current `feeDisclosure` typed, ready to re-show) / `fee_disclosure_unavailable` (I-S1).
+- `connectIntent`'s two-step failure no longer loses the connect reference: if the checkout-intent
+  request fails after `/cards/connect` already opened an order, `CardConnectIntentFailedError`
+  carries `start` (`reference_id`/`payment_link_uid`/`fee_disclosure`) so a caller can resume the
+  SAME order instead of opening a second one (m-S7).
+- `remove()`'s own retry (after a lost response) reports a subsequent `404` as
+  `CardAlreadyRemovedError` rather than a generic not-found (m-S5, shared decision with the admin
+  SDK); a first-attempt `404` is unaffected.
+- `feeDisclosure()` now validates its response the same way `connectIntent` already did, throwing
+  `CardConnectContractError` on a malformed body instead of returning one (m-S2).
+- `completeConnect` no longer polls an unrecognised 2xx body to exhaustion as if it were pending —
+  it throws `CardConnectContractError` immediately, and a malformed `account` (e.g. missing `id`)
+  is caught the same way instead of risking a raw `TypeError` (m-S3).
+- `FeePayer` / `FeeComponentKind` widen to accept an unrecognised value (`KnownUnion | (string &
+  {})`) instead of only claiming to at the type level while the runtime guard already accepted
+  anything (m-S4, shared forward-compat decision with the admin SDK).
+- `PaginationMeta.total_pages` is optional — the server only sends it when `more` is true (m-S1).
+- `connectIntent`'s `returnBase` is validated client-side (`https://` with a host, no userinfo) —
+  the server silently drops anything else rather than answering an error (m-S8).
+- Doc-only: corrected `chargeable`/`owner_id`/`brand` (processor casing) on `SavedCard`, the
+  storefront-scoping note on `CardRemovalResult.active_subscriptions`, and the replay-safety note
+  on `CardConnectPendingError` (m-S6); the `Privilege levels` table gets a `cards.*` row and
+  `CheckoutResource.merchantTokens`'s doc now warns against reusing the merchant key there.
+
 ## [1.2.0] - 2026-09-20
 
 Order-first checkout money path (additive) — the discount-preserving, 3DS-hardened
