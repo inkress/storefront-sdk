@@ -27,7 +27,7 @@ export type { CheckoutInitiator, CartCheckoutOptions } from './resources/cart';
 export * from './types';
 export { InkressApiError } from './client';
 // ApiResponse/StorefrontConfig/ErrorResponse/SdkMode come through `export * from './types'`.
-export type { HttpClient, RequestOptions } from './client';
+export type { HttpClient, RequestOptions, AuthTokenKind } from './client';
 
 // Re-export payment helpers so consumers can build hosted-checkout URLs directly.
 export {
@@ -76,7 +76,16 @@ export {
   normalizeFacetRow,
 } from './utils/variants';
 export { AddressesResource } from './resources/addresses';
-export { CardsResource, CardConnectPendingError, CardConnectContractError } from './resources/cards';
+export {
+  CardsResource,
+  CardConnectPendingError,
+  CardConnectContractError,
+  CardConnectError,
+  CardOwnerSessionRequiredError,
+  CardAlreadyRemovedError,
+  CardConnectIntentFailedError,
+  type CardConnectRefusalReason,
+} from './resources/cards';
 export * from './types/cards';
 
 // Storefront DOM kit — the opt-in `data-ik-*` / `data-fk-*` hooks + `ik:cart` /

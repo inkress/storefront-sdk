@@ -13,7 +13,12 @@ export interface PaginationMeta {
   page: number;
   page_size: number;
   total_entries: number;
-  total_pages: number;
+  /**
+   * m-S1 (final-review fix): the server (`Paginate.page_map`) only emits this when `more` is
+   * true — a last-page response omits it entirely rather than sending `0`. Optional so a
+   * last-page read doesn't require a caller to invent a value the server never sent.
+   */
+  total_pages?: number;
   more: boolean;
   next_page?: number;
   last_page?: number;
