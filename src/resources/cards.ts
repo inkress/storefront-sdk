@@ -381,6 +381,13 @@ export class CardsResource {
       try {
         return await this.client.delete<CardRemovalResult>(`/cards/${id}`);
       } catch (retryError) {
+        // Round 2 (final-review re-review, Minor #3): the retry's own catch used to check only
+        // for 404 - a 403 owner-session-required arising only on the retry (e.g. the session was
+        // invalidated between the two attempts) surfaced as a plain InkressApiError instead of
+        // this typed error, unlike the identical check the FIRST attempt's catch already ran.
+        if (retryError instanceof InkressApiError && isOwnerSessionRequiredRefusal(retryError)) {
+          throw new CardOwnerSessionRequiredError(retryError.details);
+        }
         if (retryError instanceof InkressApiError && retryError.status === 404) {
           throw new CardAlreadyRemovedError(id, retryError.details);
         }

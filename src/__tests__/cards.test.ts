@@ -123,6 +123,27 @@ describe('CardsResource', () => {
     expect(calls()).toHaveLength(2);
   });
 
+  // Round 2 (final-review re-review, Minor #3): the retry's own catch used to check only for
+  // 404, unlike the first attempt's catch (which already checked owner-session first) - a 403
+  // owner-session-required arising only on the retry (e.g. the session was invalidated between
+  // the two attempts) must be rewrapped the same way, not left as a plain InkressApiError.
+  it('remove rewraps a 403 owner-session refusal on the RETRY the same way as the first attempt', async () => {
+    fetchMock.mockRejectOnce(new TypeError('Network request failed'));
+    fetchMock.mockResponseOnce(
+      JSON.stringify({
+        state: 'error',
+        data: { result: 'Saved cards require a logged-in shopper session.' },
+        result: 'Saved cards require a logged-in shopper session.',
+      }),
+      { status: 403 },
+    );
+
+    const promise = cards.remove(9);
+
+    await expect(promise).rejects.toBeInstanceOf(CardOwnerSessionRequiredError);
+    expect(calls()).toHaveLength(2);
+  });
+
   it('remove leaves a first-attempt 404 as the plain InkressApiError', async () => {
     fetchMock.mockResponseOnce(JSON.stringify({ state: 'error', data: { result: 'Not Found' }, result: 'Not Found' }), { status: 404 });
 
