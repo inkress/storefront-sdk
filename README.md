@@ -289,13 +289,13 @@ The SDK is safe to construct and use in server loaders (Remix / RR7). Browser-on
 
 ## Using with `@inkress/admin-sdk`
 
-The two SDKs share configuration, the `ApiResponse<T>` envelope, `InkressApiError`, and the query builder API. Use the admin SDK on the server (with your secret/JWT) for management, and the storefront SDK on the client (public) for shopping:
+The two SDKs share the `ApiResponse<T>` envelope and `InkressApiError`; admin-sdk 1.1+ (the npm `latest` release) also shares the `mode`/`username` configuration and the query builder API. Use the admin SDK on the server (with your secret/JWT) for management, and the storefront SDK on the client (public) for shopping:
 
 ```typescript
 import { InkressSDK } from '@inkress/admin-sdk';
 import { InkressStorefrontSDK } from '@inkress/storefront-sdk';
 
-const admin = new InkressSDK({ accessToken, username: 'acme' });        // server
+const admin = new InkressSDK({ accessToken, username: 'acme' });        // server (admin-sdk 1.1+ on npm)
 const shop  = InkressStorefrontSDK.forMerchant('acme');                 // client
 ```
 
