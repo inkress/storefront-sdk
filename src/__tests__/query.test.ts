@@ -114,6 +114,6 @@ describe('query builders', () => {
   it('ReviewQueryBuilder builds product + min-rating filters', () => {
     const { resource } = makeResource();
     const built = new ReviewQueryBuilder(resource as any).whereProduct(123).whereMinRating(4).build();
-    expect(built).toMatchObject({ parent_id: 123, rating_min: 4 });
+    expect(built).toMatchObject({ record: 'products', record_id: 123, rating_min: 4 });
   });
 });

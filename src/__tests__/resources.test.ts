@@ -102,18 +102,29 @@ describe('OrdersResource', () => {
 });
 
 describe('ReviewsResource', () => {
-  it('getByProduct() filters by parent_id', async () => {
+  it('getByProduct() lists the product review record (record=products, record_id)', async () => {
     fetchMock.mockResponseOnce(okList());
     await new ReviewsResource(client).getByProduct(123);
-    expect(lastUrl()).toContain('/api/v1/reviews?parent_id=123');
+    expect(lastUrl()).toContain('/api/v1/reviews?');
+    expect(lastUrl()).toContain('record=products');
+    expect(lastUrl()).toContain('record_id=123');
+    expect(lastUrl()).not.toContain('parent_id');
   });
 
-  it('createQueryBuilder().whereMinRating builds rating_min', async () => {
+  it('createQueryBuilder().whereProduct().whereMinRating builds record_id and rating_min', async () => {
     fetchMock.mockResponseOnce(okList());
     await new ReviewsResource(client).createQueryBuilder().whereProduct(123).whereMinRating(4).execute();
     const url = lastUrl();
-    expect(url).toContain('parent_id=123');
+    expect(url).toContain('record=products');
+    expect(url).toContain('record_id=123');
     expect(url).toContain('rating_min=4');
+  });
+
+  it('create() names the product as record/record_id, also when given the old parent_id', async () => {
+    fetchMock.mockResponseOnce(okItem({ id: 1 }));
+    await new ReviewsResource(client).create({ parent_id: 123, rating: 5, body: 'Works', meta_data: { reviewer_name: 'Ann' } });
+    const body = JSON.parse(String(lastCall()[1]?.body));
+    expect(body).toEqual({ record: 'products', record_id: 123, rating: 5, body: 'Works', meta_data: { reviewer_name: 'Ann' } });
   });
 });
 
