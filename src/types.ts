@@ -376,21 +376,47 @@ export interface ListGenericsParams extends PaginationParams {
 // Review types
 export interface Review {
   id: number;
-  parent_id: number;
-  customer_id: number;
+  /** The reviewed record: `"products"` for a product review. */
+  record?: string;
+  /** The reviewed product's id. */
+  record_id?: number;
+  /** A reply's parent review. */
+  parent_id: number | null;
+  /** Set only for a verified purchase (the order's customer). */
+  customer_id: number | null;
   rating: number;
   body?: string;
+  meta_data?: ReviewMeta | null;
   created_at: string;
   updated_at: string;
 }
 
+/** What a shopper may put in a review's `meta_data`. The server adds `verified_purchase`. */
+export interface ReviewMeta {
+  reviewer_name?: string;
+  title?: string;
+  /** An https link to a video of the product. */
+  video_url?: string;
+  /** An order of this shop that contains the product: verifies the review when it is paid. */
+  order_uid?: string;
+  verified_purchase?: boolean;
+}
+
 export interface ReviewInput {
-  parent_id: number;
+  /** The product being reviewed. */
+  record_id?: number;
+  /** @deprecated The product id; sent as `record_id`. */
+  parent_id?: number;
+  /** 1 to 5. */
   rating: number;
   body?: string;
+  /** `reviewer_name` is required for shoppers. */
+  meta_data?: Omit<ReviewMeta, 'verified_purchase'>;
 }
 
 export interface ReviewListParams extends PaginationParams {
+  record?: string;
+  record_id?: number;
   parent_id?: number;
   customer_id?: number;
   rating?: number;

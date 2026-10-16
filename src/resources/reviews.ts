@@ -39,7 +39,7 @@ export class ReviewsResource implements Queryable<ReviewListResponse> {
   /**
    * Run a typed review query (rating range/date filters + pagination).
    *
-   * @example await reviews.query({ parent_id: 123, rating: { min: 4 }, page: 1 })
+   * @example await reviews.query({ record: 'products', record_id: 123, rating: { min: 4 }, page: 1 })
    */
   async query(params?: ReviewQueryParams): Promise<ApiResponse<ReviewListResponse>> {
     const processed = processQuery(params || {}, REVIEW_FIELD_TYPES, { context: QUERY_CONTEXT.review });
@@ -68,7 +68,9 @@ export class ReviewsResource implements Queryable<ReviewListResponse> {
    * @returns Promise resolving to the created review
    */
   async create(input: ReviewInput): Promise<ApiResponse<Review>> {
-    return this.client.post<Review>('/reviews', input);
+    // A product review names its product as record/record_id; `parent_id` names a parent review.
+    const { parent_id, record_id, ...rest } = input;
+    return this.client.post<Review>('/reviews', { ...rest, record: 'products', record_id: record_id ?? parent_id });
   }
 
   /**
@@ -103,8 +105,8 @@ export class ReviewsResource implements Queryable<ReviewListResponse> {
    * @param params - Additional query parameters
    * @returns Promise resolving to paginated list of product reviews
    */
-  async getByProduct(productId: number, params?: Omit<ReviewListParams, 'parent_id'>): Promise<ApiResponse<PaginatedResponse<Review>>> {
-    return this.list({ ...params, parent_id: productId });
+  async getByProduct(productId: number, params?: Omit<ReviewListParams, 'record' | 'record_id'>): Promise<ApiResponse<PaginatedResponse<Review>>> {
+    return this.list({ ...params, record: 'products', record_id: productId });
   }
 
   /**
@@ -139,9 +141,9 @@ export class ReviewsResource implements Queryable<ReviewListResponse> {
   async getByProductAndRating(
     productId: number, 
     rating: number, 
-    params?: Omit<ReviewListParams, 'parent_id' | 'rating'>
+    params?: Omit<ReviewListParams, 'record' | 'record_id' | 'rating'>
   ): Promise<ApiResponse<PaginatedResponse<Review>>> {
-    return this.list({ ...params, parent_id: productId, rating });
+    return this.list({ ...params, record: 'products', record_id: productId, rating });
   }
 
   /**
@@ -151,9 +153,11 @@ export class ReviewsResource implements Queryable<ReviewListResponse> {
    * @param params - Additional query parameters
    * @returns Promise resolving to paginated list of verified purchase reviews
    */
-  async getVerifiedReviews(productId: number, params?: Omit<ReviewListParams, 'parent_id'>): Promise<ApiResponse<PaginatedResponse<Review>>> {
-    // Note: The 'verified_purchase' field would need to be added to ReviewListParams if this functionality exists
-    return this.list({ ...params, parent_id: productId });
+  async getVerifiedReviews(productId: number, params?: Omit<ReviewListParams, 'record' | 'record_id'>): Promise<ApiResponse<PaginatedResponse<Review>>> {
+    // The list can't filter on meta_data, so verified reviews are picked from the product's page.
+    const response = await this.list({ ...params, record: 'products', record_id: productId });
+    if (!response.result) return response;
+    return { ...response, result: { ...response.result, entries: response.result.entries.filter((r) => r.meta_data?.verified_purchase === true) } };
   }
 
   /**
@@ -176,10 +180,11 @@ export class ReviewsResource implements Queryable<ReviewListResponse> {
    * @param params - Additional query parameters
    * @returns Promise resolving to list of most helpful reviews
    */
-  async getTopRated(productId: number, params?: Omit<ReviewListParams, 'parent_id'>): Promise<ApiResponse<Review[]>> {
+  async getTopRated(productId: number, params?: Omit<ReviewListParams, 'record' | 'record_id'>): Promise<ApiResponse<Review[]>> {
     const response = await this.list({
       ...params,
-      parent_id: productId,
+      record: 'products',
+      record_id: productId,
       sort: 'helpful_count',
       order: 'desc',
       page_size: 10

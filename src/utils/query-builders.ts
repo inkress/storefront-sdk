@@ -186,9 +186,10 @@ export class ReviewQueryBuilder extends QueryBuilder<Review> {
     return this.resource.query(this.getRawQuery());
   }
 
-  /** Reviews are attached to a product via `parent_id`. */
+  /** A product review names its product as `record: "products"`, `record_id`. */
   whereProduct(productId: number | number[]): this {
-    return Array.isArray(productId) ? this.whereIn('parent_id', productId) : this.where('parent_id', productId);
+    this.where('record', 'products');
+    return Array.isArray(productId) ? this.whereIn('record_id', productId) : this.where('record_id', productId);
   }
 
   whereRating(rating: number | number[]): this {

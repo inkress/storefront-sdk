@@ -78,6 +78,8 @@ export interface OrderQueryParams extends BaseListParams {
 }
 
 export interface ReviewQueryParams extends BaseListParams {
+  record?: string;
+  record_id?: number | number[];
   parent_id?: number | number[];
   customer_id?: number | number[];
   rating?: number | number[] | { min?: number; max?: number };
@@ -119,6 +121,8 @@ export const CATEGORY_FIELD_TYPES: Record<string, FieldType> = {
 };
 
 export const REVIEW_FIELD_TYPES: Record<string, FieldType> = {
+  record: 'string',
+  record_id: 'number',
   parent_id: 'number',
   customer_id: 'number',
   rating: 'number',
