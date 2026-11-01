@@ -5,6 +5,18 @@ All notable changes to the Inkress Storefront SDK will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] - 2026-11-01
+
+### Fixed
+- **Product reviews name their product as `record` / `record_id` (INK-1488).** `reviews.create`,
+  `getByProduct` and `getByProductAndRating` sent the product as `parent_id`, which names a parent
+  review, so reviews were filed against the wrong thing. They now send `record: 'products'` and
+  `record_id`. `create` still accepts `parent_id` as the product id. `Review` carries `record`,
+  `record_id` and `meta_data`. The API takes the review's customer only from a verified order.
+
+### Docs
+- README notes which admin-sdk release its interop example targets (INK-797).
+
 ## [1.1.2] - 2026-08-09
 
 Storefront capability release (additive). Every shape is grounded in the Commerce
