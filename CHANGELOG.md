@@ -5,6 +5,14 @@ All notable changes to the Inkress Storefront SDK will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-11-14
+
+### Added
+- **`Order.test` and `CheckoutSession.test` mark a test order (INK-1591).** A test runs the full
+  payment flow and checks the real card, but is never charged. Storefront create calls
+  (`OrderCreateRequest`, `CreateCheckoutSessionInput`) cannot make a test: only a secret key or the
+  merchant can.
+
 ## [1.1.3] - 2026-11-01
 
 ### Fixed
