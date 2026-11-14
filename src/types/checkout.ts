@@ -123,6 +123,8 @@ export interface CreateCheckoutSessionResponseData {
 
 /** Response from fetching an existing checkout session. */
 export interface CheckoutSession {
+  /** `true` for a test order: the card was checked and not charged. */
+  test?: boolean;
   status: CheckoutSessionStatus;
   title: string;
   currency: CheckoutSessionCurrency;
