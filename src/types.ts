@@ -179,6 +179,8 @@ export interface OrderLineItem {
 }
 
 export interface Order {
+  /** `true` for a test order: the card was checked and not charged. */
+  test?: boolean;
   id: number;
   reference_id: string;
   total: number;
